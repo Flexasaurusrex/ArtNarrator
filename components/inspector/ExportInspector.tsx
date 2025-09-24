@@ -1,95 +1,129 @@
-'use client';
-
-import React, { useState } from 'react';
-import { useAppStore, useTotalDuration } from '@/lib/store';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Download, Film, FileText, Settings, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Download, Play, Settings, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
+import type { RenderSettings, RenderJob } from '@/lib/schemas';
 
-export function ExportInspector() {
-  const { 
-    currentProject, 
-    scenes, 
-    export: exportState,
-    setCurrentRender,
-    addToRenderHistory 
-  } = useAppStore();
-
-  const totalDuration = useTotalDuration();
-  const [renderSettings, setRenderSettings] = useState({
+export const ExportInspector: React.FC = () => {
+  const { currentProject, scenes, export: exportState, setCurrentRender, addToRenderHistory } = useAppStore();
+  
+  const [renderSettings, setRenderSettings] = useState<RenderSettings>({
     quality: 'standard',
     format: 'mp4',
+    width: 1920,
+    height: 1080,
+    fps: 30,
     includeSubtitles: true,
   });
 
-  const qualityOptions = {
-    draft: { width: 720, height: 1280, bitrate: 8, fps: 24 },
-    standard: { width: 1080, height: 1920, bitrate: 12, fps: 30 },
-    high: { width: 1080, height: 1920, bitrate: 20, fps: 30 },
-  };
+  const [isRendering, setIsRendering] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderLogs, setRenderLogs] = useState<string[]>([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const currentQuality = qualityOptions[renderSettings.quality as keyof typeof qualityOptions];
+  // Update dimensions based on project aspect ratio
+  useEffect(() => {
+    if (currentProject) {
+      const [width, height] = currentProject.aspect.split('x').map(Number);
+      setRenderSettings(prev => ({
+        ...prev,
+        width,
+        height,
+        fps: currentProject.fps,
+      }));
+    }
+  }, [currentProject]);
+
+  const totalDuration = scenes.reduce((total, scene) => total + scene.durationSec, 0);
+  const canRender = currentProject && scenes.length > 0 && totalDuration > 0;
 
   const handleStartRender = async () => {
-    if (!currentProject) return;
+    if (!currentProject || !canRender) return;
+
+    setIsRendering(true);
+    setRenderProgress(0);
+    setRenderLogs([]);
+
+    const renderJob: RenderJob = {
+      id: `render_${Date.now()}`,
+      projectId: currentProject.id || '',
+      status: 'queued',
+      progress: 0,
+      settings: JSON.stringify(renderSettings),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    setCurrentRender(renderJob);
 
     try {
       const response = await fetch('/api/render', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId: currentProject.id,
-          settings: {
-            ...renderSettings,
-            ...currentQuality,
-          },
+          settings: renderSettings,
         }),
       });
 
       const data = await response.json();
       
-      if (data.success) {
-        setCurrentRender(data.data);
-        // Start polling for progress
-        pollRenderProgress(data.data.id);
+      if (!data.success) {
+        throw new Error(data.error || 'Render failed');
       }
-    } catch (error) {
-      console.error('Failed to start render:', error);
-    }
-  };
 
-  const pollRenderProgress = async (jobId: string) => {
-    const poll = async () => {
-      try {
-        const response = await fetch(`/api/render/${jobId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          setCurrentRender(data.data);
+      const jobId = data.data.jobId;
+      
+      // Poll for progress
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(`/api/render/${jobId}`);
+          const statusData = await statusResponse.json();
           
-          if (data.data.status === 'done') {
-            addToRenderHistory(data.data);
-          } else if (data.data.status === 'error') {
-            // Handle error
-            console.error('Render failed:', data.data.logs);
-          } else {
-            // Continue polling
-            setTimeout(poll, 2000);
+          if (statusData.success) {
+            const job = statusData.data;
+            setRenderProgress(job.progress * 100);
+            
+            if (job.logs) {
+              setRenderLogs(job.logs.split('\n').filter(Boolean));
+            }
+            
+            if (job.status === 'done') {
+              clearInterval(pollInterval);
+              setIsRendering(false);
+              
+              const completedJob = {
+                ...renderJob,
+                status: 'done' as const,
+                progress: 1,
+                outputUrl: job.outputUrl,
+                updatedAt: new Date(),
+              };
+              
+              setCurrentRender(completedJob);
+              addToRenderHistory(completedJob);
+            } else if (job.status === 'error') {
+              clearInterval(pollInterval);
+              setIsRendering(false);
+              throw new Error(job.logs || 'Render failed');
+            }
           }
+        } catch (pollError) {
+          clearInterval(pollInterval);
+          setIsRendering(false);
+          console.error('Poll error:', pollError);
         }
-      } catch (error) {
-        console.error('Failed to poll render status:', error);
-      }
-    };
-    
-    poll();
+      }, 1000);
+
+    } catch (error) {
+      setIsRendering(false);
+      console.error('Render error:', error);
+      setRenderLogs(prev => [...prev, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+    }
   };
 
   const handleCancelRender = async () => {
@@ -98,227 +132,277 @@ export function ExportInspector() {
         await fetch(`/api/render/${exportState.currentRender.id}`, {
           method: 'DELETE',
         });
-        setCurrentRender(null);
       } catch (error) {
-        console.error('Failed to cancel render:', error);
+        console.error('Cancel error:', error);
       }
+    }
+    
+    setIsRendering(false);
+    setCurrentRender(null);
+    setRenderProgress(0);
+  };
+
+  const handleDownload = (url: string, filename?: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'video.mp4';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const getQualityDescription = (quality: string) => {
+    switch (quality) {
+      case 'draft': return 'Fast render, lower quality';
+      case 'standard': return 'Balanced quality and speed';
+      case 'high': return 'Best quality, slower render';
+      default: return '';
     }
   };
 
-  const getEstimatedFileSize = () => {
-    const bitrateMbps = currentQuality.bitrate / 8; // Convert to MB/s
-    const sizeInMB = totalDuration * bitrateMbps;
-    return sizeInMB > 1000 ? `${(sizeInMB / 1000).toFixed(1)} GB` : `${Math.round(sizeInMB)} MB`;
+  const getEstimatedTime = () => {
+    if (!totalDuration) return 'Unknown';
+    const multiplier = renderSettings.quality === 'draft' ? 2 : renderSettings.quality === 'high' ? 8 : 4;
+    const estimatedSeconds = totalDuration * multiplier;
+    const minutes = Math.ceil(estimatedSeconds / 60);
+    return `~${minutes} min${minutes !== 1 ? 's' : ''}`;
+  };
+
+  const getFileSizeEstimate = () => {
+    if (!totalDuration) return 'Unknown';
+    const bitrateMbps = renderSettings.quality === 'draft' ? 2 : renderSettings.quality === 'high' ? 8 : 5;
+    const sizeBytes = (totalDuration * bitrateMbps * 1024 * 1024) / 8;
+    const sizeMB = Math.ceil(sizeBytes / (1024 * 1024));
+    return `~${sizeMB} MB`;
   };
 
   return (
-    <div className="space-y-4">
-      {/* Project Info */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Project Summary</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Scenes:</span>
-            <span>{scenes.length}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span>Duration:</span>
-            <span>{Math.round(totalDuration)}s</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span>Aspect Ratio:</span>
-            <span>{currentProject?.aspect}</span>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="space-y-6">
       {/* Render Settings */}
-      <Card>
+      <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-sm flex items-center">
-            <Settings className="w-4 h-4 mr-2" />
+          <CardTitle className="text-gray-100 flex items-center gap-2">
+            <Settings className="h-5 w-5" />
             Export Settings
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Quality</Label>
-            <Select 
-              value={renderSettings.quality} 
-              onValueChange={(value) => setRenderSettings(prev => ({ ...prev, quality: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="draft">Draft (720p, 8 Mbps)</SelectItem>
-                <SelectItem value="standard">Standard (1080p, 12 Mbps)</SelectItem>
-                <SelectItem value="high">High (1080p, 20 Mbps)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-gray-200">Quality</Label>
+              <select
+                value={renderSettings.quality}
+                onChange={(e) => setRenderSettings(prev => ({ ...prev, quality: e.target.value as RenderSettings['quality'] }))}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="draft">Draft</option>
+                <option value="standard">Standard</option>
+                <option value="high">High</option>
+              </select>
+              <p className="text-xs text-gray-400">{getQualityDescription(renderSettings.quality)}</p>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Format</Label>
-            <Select 
-              value={renderSettings.format} 
-              onValueChange={(value) => setRenderSettings(prev => ({ ...prev, format: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mp4">MP4 (H.264)</SelectItem>
-                <SelectItem value="gif">GIF (for short videos)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label className="text-gray-200">Format</Label>
+              <select
+                value={renderSettings.format}
+                onChange={(e) => setRenderSettings(prev => ({ ...prev, format: e.target.value as RenderSettings['format'] }))}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="mp4">MP4 Video</option>
+                <option value="gif">Animated GIF</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
-            <Label>Include Subtitles</Label>
+            <Label className="text-gray-200">Include Subtitles</Label>
             <Switch
               checked={renderSettings.includeSubtitles}
-              onCheckedChange={(checked) => 
-                setRenderSettings(prev => ({ ...prev, includeSubtitles: checked }))
-              }
+              onCheckedChange={(checked) => setRenderSettings(prev => ({ ...prev, includeSubtitles: checked }))}
             />
           </div>
 
-          {/* Preview specs */}
-          <div className="bg-muted/50 p-3 rounded text-xs space-y-1">
-            <div className="flex justify-between">
-              <span>Resolution:</span>
-              <span>{currentQuality.width}×{currentQuality.height}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="border-gray-600 text-gray-300"
+          >
+            {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+          </Button>
+
+          {showAdvanced && (
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-600">
+              <div className="space-y-2">
+                <Label className="text-gray-200">Resolution</Label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={renderSettings.width}
+                    onChange={(e) => setRenderSettings(prev => ({ ...prev, width: Number(e.target.value) }))}
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="360"
+                    max="4096"
+                  />
+                  <span className="text-gray-400 py-2">×</span>
+                  <input
+                    type="number"
+                    value={renderSettings.height}
+                    onChange={(e) => setRenderSettings(prev => ({ ...prev, height: Number(e.target.value) }))}
+                    className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min="360"
+                    max="4096"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-200">Frame Rate</Label>
+                <select
+                  value={renderSettings.fps}
+                  onChange={(e) => setRenderSettings(prev => ({ ...prev, fps: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="24">24 FPS</option>
+                  <option value="25">25 FPS</option>
+                  <option value="30">30 FPS</option>
+                  <option value="60">60 FPS</option>
+                </select>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>Frame Rate:</span>
-              <span>{currentQuality.fps} fps</span>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Export Summary */}
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-blue-400">{totalDuration.toFixed(1)}s</div>
+              <div className="text-xs text-gray-400">Duration</div>
             </div>
-            <div className="flex justify-between">
-              <span>Estimated Size:</span>
-              <span>{getEstimatedFileSize()}</span>
+            <div>
+              <div className="text-2xl font-bold text-green-400">{getEstimatedTime()}</div>
+              <div className="text-xs text-gray-400">Est. Render Time</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-purple-400">{getFileSizeEstimate()}</div>
+              <div className="text-xs text-gray-400">Est. File Size</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Current Render */}
-      {exportState.currentRender ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center">
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Rendering
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={exportState.currentRender.progress * 100} />
-            
-            <div className="flex justify-between text-sm">
-              <span>Status:</span>
-              <Badge variant={
-                exportState.currentRender.status === 'done' ? 'default' :
-                exportState.currentRender.status === 'error' ? 'destructive' : 'secondary'
-              }>
-                {exportState.currentRender.status}
-              </Badge>
-            </div>
-
-            <div className="flex space-x-2">
-              {exportState.currentRender.status === 'done' && exportState.currentRender.outputUrl && (
-                <Button asChild size="sm">
-                  <a href={exportState.currentRender.outputUrl} download>
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </a>
-                </Button>
-              )}
-              
-              {exportState.currentRender.status === 'rendering' && (
-                <Button variant="destructive" size="sm" onClick={handleCancelRender}>
+      {/* Render Control */}
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="pt-6">
+          {!isRendering && !exportState.currentRender ? (
+            <Button
+              onClick={handleStartRender}
+              disabled={!canRender}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              size="lg"
+            >
+              <Play className="h-5 w-5 mr-2" />
+              Start Export
+            </Button>
+          ) : isRendering ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-200">Rendering...</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancelRender}
+                  className="border-red-600 text-red-400 hover:bg-red-600"
+                >
+                  <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
+              </div>
+              <Progress value={renderProgress} className="w-full" />
+              <div className="text-center text-sm text-gray-400">
+                {Math.round(renderProgress)}% complete
+              </div>
+            </div>
+          ) : exportState.currentRender?.status === 'done' ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-green-400">
+                <CheckCircle className="h-5 w-5" />
+                <span>Export Complete!</span>
+              </div>
+              {exportState.currentRender.outputUrl && (
+                <Button
+                  onClick={() => handleDownload(exportState.currentRender!.outputUrl!)}
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  size="lg"
+                >
+                  <Download className="h-5 w-5 mr-2" />
+                  Download Video
+                </Button>
               )}
             </div>
+          ) : (
+            <div className="flex items-center gap-2 text-red-400">
+              <AlertCircle className="h-5 w-5" />
+              <span>Export failed. Check logs below.</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-            {exportState.currentRender.logs && (
-              <div className="text-xs bg-muted p-2 rounded max-h-20 overflow-y-auto">
-                {exportState.currentRender.logs}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        /* Start Render */
-        <Card>
-          <CardContent className="pt-6">
-            <Button 
-              className="w-full"
-              onClick={handleStartRender}
-              disabled={scenes.length === 0}
-            >
-              <Film className="w-4 h-4 mr-2" />
-              Start Rendering
-            </Button>
+      {/* Render Logs */}
+      {renderLogs.length > 0 && (
+        <Card className="bg-gray-800 border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-gray-100 text-sm">Export Logs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-black rounded-md p-3 max-h-40 overflow-y-auto">
+              {renderLogs.map((log, index) => (
+                <div key={index} className="text-xs text-gray-300 font-mono">
+                  {log}
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Export History */}
       {exportState.renderHistory.length > 0 && (
-        <Card>
+        <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
-            <CardTitle className="text-sm">Recent Exports</CardTitle>
+            <CardTitle className="text-gray-100 text-sm">Recent Exports</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {exportState.renderHistory.map((job) => (
-              <div key={job.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                <div className="flex items-center space-x-2">
-                  {job.status === 'done' ? (
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-red-500" />
-                  )}
-                  <div className="text-xs">
-                    <div>{job.createdAt ? new Date(job.createdAt).toLocaleString() : 'Unknown'}</div>
-                    <div className="text-muted-foreground">
-                      {job.settings ? JSON.parse(job.settings).quality : 'standard'} quality
+          <CardContent>
+            <div className="space-y-2">
+              {exportState.renderHistory.slice(0, 3).map((job) => (
+                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-md">
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-200">{job.createdAt?.toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-400">
+                      {job.status === 'done' ? 'Completed' : 'Failed'}
                     </div>
                   </div>
+                  {job.status === 'done' && job.outputUrl && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleDownload(job.outputUrl!)}
+                      className="border-gray-600 text-gray-300"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                
-                {job.status === 'done' && job.outputUrl && (
-                  <Button asChild variant="ghost" size="sm">
-                    <a href={job.outputUrl} download>
-                      <Download className="w-4 h-4" />
-                    </a>
-                  </Button>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
-
-      {/* Additional Export Options */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Additional Exports</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Button variant="outline" size="sm" className="w-full justify-start">
-            <FileText className="w-4 h-4 mr-2" />
-            Export SRT Subtitles
-          </Button>
-          
-          <Button variant="outline" size="sm" className="w-full justify-start">
-            <Download className="w-4 h-4 mr-2" />
-            Export Project JSON
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
-}
+};
