@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  title     String
+  aspect    String   @default("1080x1920") // "1080x1920" | "1920x1080" | "1080x1080" | "1080x1350"
+  fps       Int      @default(30)
+  bgColor   String   @default("#000000")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scenes      Scene[]
+  textStyles  TextStyle[]
+  musicTracks MusicTrack[]
+  renderJobs  RenderJob[]
+
+  @@map("projects")
+}
+
+model Scene {
+  id          String  @id @default(cuid())
+  projectId   String
+  order       Int
+  durationSec Float
+  imageUrl    String?
+  title       String  @default("")
+  body        String  @default("")
+  credit      String  @default("")
+  fx          String  @default("none") // "none" | "fade" | "kenburns_slow" | "kenburns_medium" | "pan_right" | "pan_left"
+  safeArea    String  @default("bottom") // "top" | "bottom" | "custom"
+  textStyleId String?
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  textStyle TextStyle? @relation(fields: [textStyleId], references: [id])
+
+  @@map("scenes")
+}
+
+model TextStyle {
+  id        String @id @default(cuid())
+  projectId String
+  name      String @default("Default")
+  
+  // Typography
+  titleFont  String @default("Inter")
+  bodyFont   String @default("Inter")
+  titleSize  Int    @default(64)
+  bodySize   Int    @default(44)
+  weight     String @default("600") // "400" | "600" | "700" | "800"
+  align      String @default("left") // "left" | "center" | "right"
+  
+  // Visual effects
+  shadow    Float  @default(0.4) // 0.0-1.0
+  outline   Int    @default(2) // outline width in px
+  color     String @default("#ffffff")
+  bgBlur    Float  @default(0.0) // 0.0-1.0 background blur
+  bgOpacity Float  @default(0.0) // 0.0-1.0 background opacity
+  padding   Int    @default(32) // padding in px
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes  Scene[]
+
+  @@map("text_styles")
+}
+
+model MusicTrack {
+  id        String @id @default(cuid())
+  projectId String
+  url       String
+  inSec     Float  @default(0.0)
+  outSec    Float?
+  volume    Float  @default(0.5) // 0.0-1.0
+  duckUnderText Boolean @default(false) // Auto-duck during text scenes
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("music_tracks")
+}
+
+model RenderJob {
+  id        String   @id @default(cuid())
+  projectId String
+  status    String   @default("queued") // "queued" | "rendering" | "done" | "error"
+  progress  Float    @default(0.0) // 0.0-1.0
+  outputUrl String?
+  logs      String?
+  settings  String? // JSON string of render settings
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("render_jobs")
+}
