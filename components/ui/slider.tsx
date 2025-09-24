@@ -2,7 +2,7 @@ import * as React from "react"
 import * as SliderPrimitive from "@radix-ui/react-slider"
 import { cn } from "@/lib/utils"
 
-const Slider = React.forwardRef((props, ref) => {
+const Slider = React.forwardRef((props: any, ref: any) => {
   const { className, ...otherProps } = props;
   return (
     <SliderPrimitive.Root
@@ -17,7 +17,6 @@ const Slider = React.forwardRef((props, ref) => {
     </SliderPrimitive.Root>
   );
 });
-
 Slider.displayName = SliderPrimitive.Root.displayName;
 
 export { Slider };
