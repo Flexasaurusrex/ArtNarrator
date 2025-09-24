@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Process image with Sharp (resize, optimize)
     let processedBuffer = buffer;
     if (file.type !== 'image/svg+xml') {
-      processedBuffer = await sharp(buffer)
+      processedBuffer = await sharp(Buffer.from(buffer))
         .resize(1920, 1080, { 
           fit: 'inside', 
           withoutEnlargement: true 
