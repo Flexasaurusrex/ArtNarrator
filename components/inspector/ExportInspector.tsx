@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Download, Play, Settings, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
@@ -217,10 +216,15 @@ export const ExportInspector: React.FC = () => {
 
           <div className="flex items-center justify-between">
             <Label className="text-gray-200">Include Subtitles</Label>
-            <Switch
-              checked={renderSettings.includeSubtitles}
-              onCheckedChange={(checked) => setRenderSettings(prev => ({ ...prev, includeSubtitles: checked }))}
-            />
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={renderSettings.includeSubtitles}
+                onChange={(e) => setRenderSettings(prev => ({ ...prev, includeSubtitles: e.target.checked }))}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
           </div>
 
           <Button
@@ -322,7 +326,7 @@ export const ExportInspector: React.FC = () => {
                   Cancel
                 </Button>
               </div>
-              <Progress value={renderProgress} className="w-full" />
+              <Progress value={renderProgress} />
               <div className="text-center text-sm text-gray-400">
                 {Math.round(renderProgress)}% complete
               </div>
