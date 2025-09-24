@@ -1,50 +1,40 @@
-'use client';
-
 import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Sparkles, Loader2, Download } from 'lucide-react';
-import Image from 'next/image';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Sparkles, Download } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
+import type { AIImagePrompt } from '@/lib/schemas';
 
-interface AIImageGeneratorProps {
-  onImageGenerated: (url: string) => void;
-}
-
-interface GenerationResult {
+interface GeneratedImage {
   id: string;
   url: string;
   prompt: string;
-  status: 'generating' | 'completed' | 'failed';
+  style: string;
+  createdAt: Date;
 }
 
-export function AIImageGenerator({ onImageGenerated }: AIImageGeneratorProps) {
+export const AIImageGenerator: React.FC = () => {
   const [prompt, setPrompt] = useState('');
-  const [style, setStyle] = useState('cinematic');
-  const [aspectRatio, setAspectRatio] = useState('16:9');
+  const [style, setStyle] = useState<AIImagePrompt['style']>('cinematic');
+  const [aspectRatio, setAspectRatio] = useState<AIImagePrompt['aspectRatio']>('16:9');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [results, setResults] = useState<GenerationResult[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  const isAIEnabled = process.env.NEXT_PUBLIC_ENABLE_AI_FEATURES === 'true';
+  const { addScene } = useAppStore();
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {
+      setError('Please enter a prompt');
+      return;
+    }
 
     setIsGenerating(true);
-    const generationId = Date.now().toString();
-
-    // Add pending result
-    const pendingResult: GenerationResult = {
-      id: generationId,
-      url: '',
-      prompt,
-      status: 'generating',
-    };
-    setResults(prev => [pendingResult, ...prev]);
+    setError(null);
 
     try {
       const response = await fetch('/api/ai/generate-image', {
@@ -53,7 +43,7 @@ export function AIImageGenerator({ onImageGenerated }: AIImageGeneratorProps) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt,
+          prompt: prompt.trim(),
           style,
           aspectRatio,
         }),
@@ -61,184 +51,218 @@ export function AIImageGenerator({ onImageGenerated }: AIImageGeneratorProps) {
 
       const data = await response.json();
 
-      if (data.success) {
-        // Update result with completed image
-        setResults(prev => prev.map(result => 
-          result.id === generationId 
-            ? { ...result, url: data.data.url, status: 'completed' }
-            : result
-        ));
-      } else {
-        setResults(prev => prev.map(result => 
-          result.id === generationId 
-            ? { ...result, status: 'failed' }
-            : result
-        ));
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate image');
       }
-    } catch (error) {
-      console.error('AI generation failed:', error);
-      setResults(prev => prev.map(result => 
-        result.id === generationId 
-          ? { ...result, status: 'failed' }
-          : result
-      ));
+
+      const newImage: GeneratedImage = {
+        id: `gen_${Date.now()}`,
+        url: data.data.url,
+        prompt: prompt.trim(),
+        style,
+        createdAt: new Date(),
+      };
+
+      setGeneratedImages(prev => [newImage, ...prev]);
+      setPrompt('');
+    } catch (err) {
+      console.error('Image generation error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to generate image');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  if (!isAIEnabled) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center">
-            <Sparkles className="w-4 h-4 mr-2" />
-            AI Image Generation
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground mb-2">
-              AI image generation is disabled
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Enable ENABLE_AI_FEATURES in your environment variables
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleAddToProject = (image: GeneratedImage) => {
+    addScene({
+      projectId: '',
+      order: 0,
+      durationSec: 5,
+      imageUrl: image.url,
+      title: 'AI Generated Scene',
+      body: image.prompt,
+      credit: `AI Generated (${image.style})`,
+      fx: 'kenburns_slow',
+      safeArea: 'bottom',
+    });
+  };
+
+  const handleDownload = async (image: GeneratedImage) => {
+    try {
+      const response = await fetch(image.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ai-generated-${image.id}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
+
+  const styles = [
+    { value: 'photographic', label: 'Photographic' },
+    { value: 'cinematic', label: 'Cinematic' },
+    { value: 'artistic', label: 'Artistic' },
+    { value: 'vintage', label: 'Vintage' },
+  ];
+
+  const aspectRatios = [
+    { value: '1:1', label: 'Square (1:1)' },
+    { value: '16:9', label: 'Landscape (16:9)' },
+    { value: '9:16', label: 'Portrait (9:16)' },
+    { value: '4:5', label: 'Social (4:5)' },
+  ];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm flex items-center">
-          <Sparkles className="w-4 h-4 mr-2" />
-          AI Image Generation
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Generation Form */}
-        <div className="space-y-3">
+    <div className="space-y-6">
+      {/* Generation Form */}
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader>
+          <CardTitle className="text-gray-100 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-blue-400" />
+            AI Image Generator
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Prompt</Label>
+            <Label htmlFor="prompt" className="text-gray-200">Prompt</Label>
             <Textarea
-              placeholder="Describe the image you want to generate..."
+              id="prompt"
+              placeholder="Describe the image you want to create..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              rows={3}
+              className="bg-gray-700 border-gray-600 text-gray-100 placeholder:text-gray-400 min-h-[100px]"
               maxLength={500}
             />
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-gray-400 text-right">
               {prompt.length}/500 characters
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Style</Label>
-              <Select value={style} onValueChange={setStyle}>
-                <SelectTrigger>
+              <Label className="text-gray-200">Style</Label>
+              <Select value={style} onValueChange={(value: AIImagePrompt['style']) => setStyle(value)}>
+                <SelectTrigger className="bg-gray-700 border-gray-600 text-gray-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="photographic">Photographic</SelectItem>
-                  <SelectItem value="cinematic">Cinematic</SelectItem>
-                  <SelectItem value="artistic">Artistic</SelectItem>
-                  <SelectItem value="vintage">Vintage</SelectItem>
+                  {styles.map((styleOption) => (
+                    <SelectItem key={styleOption.value} value={styleOption.value}>
+                      {styleOption.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Aspect Ratio</Label>
-              <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                <SelectTrigger>
+              <Label className="text-gray-200">Aspect Ratio</Label>
+              <Select value={aspectRatio} onValueChange={(value: AIImagePrompt['aspectRatio']) => setAspectRatio(value)}>
+                <SelectTrigger className="bg-gray-700 border-gray-600 text-gray-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="16:9">16:9 (Landscape)</SelectItem>
-                  <SelectItem value="9:16">9:16 (Portrait)</SelectItem>
-                  <SelectItem value="1:1">1:1 (Square)</SelectItem>
-                  <SelectItem value="4:5">4:5 (Portrait)</SelectItem>
+                  {aspectRatios.map((ratio) => (
+                    <SelectItem key={ratio.value} value={ratio.value}>
+                      {ratio.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
+          {error && (
+            <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-md p-3">
+              {error}
+            </div>
+          )}
+
           <Button 
-            onClick={handleGenerate}
-            disabled={!prompt.trim() || isGenerating}
-            className="w-full"
+            onClick={handleGenerate} 
+            disabled={isGenerating || !prompt.trim()}
+            className="w-full bg-blue-600 hover:bg-blue-700"
           >
             {isGenerating ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Generating...
+              </>
             ) : (
-              <Sparkles className="w-4 h-4 mr-2" />
+              <>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Generate Image
+              </>
             )}
-            Generate Image
           </Button>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Results */}
-        {results.length > 0 && (
-          <div className="space-y-3">
-            <Label>Generated Images</Label>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {results.map((result) => (
-                <div key={result.id} className="flex items-center space-x-3 p-2 bg-muted/50 rounded">
-                  <div className="w-16 h-16 rounded overflow-hidden bg-muted flex-shrink-0">
-                    {result.status === 'generating' ? (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 animate-spin" />
-                      </div>
-                    ) : result.status === 'completed' ? (
-                      <Image
-                        src={result.url}
-                        alt={result.prompt}
-                        width={64}
-                        height={64}
-                        className="object-cover w-full h-full"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-destructive">
-                        ✗
-                      </div>
-                    )}
+      {/* Generated Images */}
+      {generatedImages.length > 0 && (
+        <Card className="bg-gray-800 border-gray-700">
+          <CardHeader>
+            <CardTitle className="text-gray-100">Generated Images</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {generatedImages.map((image) => (
+                <div key={image.id} className="space-y-3">
+                  <div className="relative group">
+                    <img 
+                      src={image.url} 
+                      alt={image.prompt}
+                      className="w-full aspect-video object-cover rounded-lg bg-gray-700"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = '/placeholder-image.jpg';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleDownload(image)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddToProject(image)}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        Add to Project
+                      </Button>
+                    </div>
                   </div>
-
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">
-                      {result.prompt}
-                    </p>
-                    <Badge 
-                      variant={
-                        result.status === 'completed' ? 'default' :
-                        result.status === 'generating' ? 'secondary' : 'destructive'
-                      }
-                      className="text-xs"
-                    >
-                      {result.status}
-                    </Badge>
+                  <div className="space-y-1">
+                    <p className="text-gray-300 text-sm line-clamp-2">{image.prompt}</p>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span className="capitalize">{image.style}</span>
+                      <span>{image.createdAt.toLocaleTimeString()}</span>
+                    </div>
                   </div>
-
-                  {result.status === 'completed' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onImageGenerated(result.url)}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  )}
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No Images State */}
+      {generatedImages.length === 0 && !isGenerating && (
+        <div className="text-center py-12 text-gray-500">
+          <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No images generated yet</p>
+          <p className="text-sm">Enter a prompt above to get started</p>
+        </div>
+      )}
+    </div>
   );
-}
+};
