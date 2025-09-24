@@ -1,5 +1,5 @@
 import AWS from 'aws-sdk';
-import { createClient } from '@supabase/storage-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { join } from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -17,7 +17,6 @@ class LocalStorageAdapter implements StorageAdapter {
   }
 
   async upload(file: Buffer, filename: string, contentType: string): Promise<string> {
-    // Ensure upload directory exists
     if (!existsSync(this.uploadDir)) {
       await mkdir(this.uploadDir, { recursive: true });
     }
@@ -30,7 +29,55 @@ class LocalStorageAdapter implements StorageAdapter {
 
   async delete(url: string): Promise<void> {
     // Implementation for local file deletion
-    // This would remove the file from the local filesystem
+  }
+}
+
+class SupabaseStorageAdapter implements StorageAdapter {
+  private supabase: SupabaseClient;
+  private bucket: string;
+
+  constructor() {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase URL and ANON KEY are required');
+    }
+
+    this.supabase = createClient(supabaseUrl, supabaseKey);
+    this.bucket = process.env.SUPABASE_STORAGE_BUCKET || 'artnarrator';
+  }
+
+  async upload(file: Buffer, filename: string, contentType: string): Promise<string> {
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .upload(filename, file, {
+        contentType,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new Error(`Supabase upload failed: ${error.message}`);
+    }
+
+    const { data: urlData } = this.supabase.storage
+      .from(this.bucket)
+      .getPublicUrl(filename);
+
+    return urlData.publicUrl;
+  }
+
+  async delete(url: string): Promise<void> {
+    const filename = url.split('/').pop();
+    if (!filename) return;
+
+    const { error } = await this.supabase.storage
+      .from(this.bucket)
+      .remove([filename]);
+
+    if (error) {
+      console.error('Failed to delete file from Supabase:', error);
+    }
   }
 }
 
@@ -70,47 +117,6 @@ class S3StorageAdapter implements StorageAdapter {
     };
 
     await this.s3.deleteObject(params).promise();
-  }
-}
-
-class SupabaseStorageAdapter implements StorageAdapter {
-  private storage: any;
-  private bucket: string;
-
-  constructor() {
-    this.storage = createClient(
-      process.env.SUPABASE_URL || '',
-      process.env.SUPABASE_ANON_KEY || ''
-    );
-    this.bucket = process.env.SUPABASE_STORAGE_BUCKET || 'artnarrator';
-  }
-
-  async upload(file: Buffer, filename: string, contentType: string): Promise<string> {
-    const { data, error } = await this.storage
-      .from(this.bucket)
-      .upload(filename, file, {
-        contentType,
-        upsert: false,
-      });
-
-    if (error) {
-      throw new Error(`Supabase upload failed: ${error.message}`);
-    }
-
-    const { data: urlData } = this.storage
-      .from(this.bucket)
-      .getPublicUrl(filename);
-
-    return urlData.publicUrl;
-  }
-
-  async delete(url: string): Promise<void> {
-    const filename = url.split('/').pop();
-    if (!filename) return;
-
-    await this.storage
-      .from(this.bucket)
-      .remove([filename]);
   }
 }
 
