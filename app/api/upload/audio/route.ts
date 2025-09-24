@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { createStorageAdapter } from '@/lib/storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,21 +34,13 @@ export async function POST(request: NextRequest) {
 
     // Generate unique filename
     const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
     const extension = file.name.split('.').pop() || 'mp3';
-    const filename = `audio_${timestamp}.${extension}`;
-    
-    // Ensure upload directory exists
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'audio');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    const filename = `audio_${timestamp}_${randomSuffix}.${extension}`;
 
-    const filepath = join(uploadDir, filename);
-
-    // Save file
-    await writeFile(filepath, buffer);
-
-    const fileUrl = `/uploads/audio/${filename}`;
+    // Upload using storage adapter
+    const storage = createStorageAdapter();
+    const fileUrl = await storage.upload(buffer, filename, file.type);
 
     return NextResponse.json({
       success: true,
