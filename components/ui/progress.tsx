@@ -2,7 +2,7 @@ import * as React from "react"
 import * as ProgressPrimitive from "@radix-ui/react-progress"
 import { cn } from "@/lib/utils"
 
-const Progress = React.forwardRef((props, ref) => {
+const Progress = React.forwardRef((props: any, ref: any) => {
   const { className, value, ...otherProps } = props;
   return (
     <ProgressPrimitive.Root
