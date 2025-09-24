@@ -71,7 +71,7 @@ export function SceneCard({ scene, isSelected }: SceneCardProps) {
   const handleDurationSave = () => {
     const newDuration = parseFloat(durationValue);
     if (!isNaN(newDuration) && newDuration > 0 && newDuration <= 30) {
-      updateScene(scene.id!, { durationSec: newDuration });
+      updateScene(scene.id!, { id: scene.id!, durationSec: newDuration });
     } else {
       setDurationValue(scene.durationSec.toString());
     }
@@ -187,7 +187,7 @@ export function SceneCard({ scene, isSelected }: SceneCardProps) {
             <MoreHorizontal className="w-3 h-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        <DropdownMenuContent>
           <DropdownMenuItem onClick={handlePlayFromHere}>
             <Play className="w-4 h-4 mr-2" />
             Play from here
