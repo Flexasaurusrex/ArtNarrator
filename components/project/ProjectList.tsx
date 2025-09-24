@@ -150,7 +150,7 @@ export function ProjectList() {
                     <MoreHorizontal className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => loadProject(project.id!)}>
                     <FolderOpen className="w-4 h-4 mr-2" />
                     Open
