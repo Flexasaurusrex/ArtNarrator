@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
 import sharp from 'sharp';
+import { createStorageAdapter } from '@/lib/storage';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,16 +35,8 @@ export async function POST(request: NextRequest) {
 
     // Generate unique filename
     const timestamp = Date.now();
-    const extension = file.type.split('/')[1];
-    const filename = `${timestamp}.${extension}`;
-    
-    // Ensure upload directory exists
-    const uploadDir = join(process.cwd(), 'public', 'uploads');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
-
-    const filepath = join(uploadDir, filename);
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const filename = `image_${timestamp}_${randomSuffix}.jpg`;
 
     // Process image with Sharp (resize, optimize)
     let processedBuffer = buffer;
@@ -63,10 +53,9 @@ export async function POST(request: NextRequest) {
         .toBuffer();
     }
 
-    // Save file
-    await writeFile(filepath, processedBuffer);
-
-    const fileUrl = `/uploads/${filename}`;
+    // Upload using storage adapter
+    const storage = createStorageAdapter();
+    const fileUrl = await storage.upload(processedBuffer, filename, 'image/jpeg');
 
     return NextResponse.json({
       success: true,
@@ -74,7 +63,7 @@ export async function POST(request: NextRequest) {
         url: fileUrl,
         filename: filename,
         size: processedBuffer.length,
-        mimetype: file.type,
+        mimetype: 'image/jpeg',
       },
     });
   } catch (error) {
