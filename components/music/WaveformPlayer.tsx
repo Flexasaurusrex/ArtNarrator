@@ -27,7 +27,7 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
   className = '',
 }) => {
   const waveformRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -70,6 +70,7 @@ export const WaveformPlayer: React.FC<WaveformPlayerProps> = ({
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.pause();
+      audioRef.current = null;
     };
   }, [audioUrl, inTime, outTime, volume]);
 
