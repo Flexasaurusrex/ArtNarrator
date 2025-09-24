@@ -10,7 +10,7 @@ const DropdownMenuPortal = DropdownMenuPrimitive.Portal
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
 
-const DropdownMenuSubTrigger = (props) => {
+const DropdownMenuSubTrigger = (props: any) => {
   const { className, inset, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.SubTrigger
@@ -27,7 +27,7 @@ const DropdownMenuSubTrigger = (props) => {
   );
 };
 
-const DropdownMenuSubContent = (props) => {
+const DropdownMenuSubContent = (props: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.SubContent
@@ -42,7 +42,7 @@ const DropdownMenuSubContent = (props) => {
   );
 };
 
-const DropdownMenuContent = (props) => {
+const DropdownMenuContent = (props: any) => {
   const { className, sideOffset = 4, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Portal>
@@ -60,7 +60,7 @@ const DropdownMenuContent = (props) => {
   );
 };
 
-const DropdownMenuItem = (props) => {
+const DropdownMenuItem = (props: any) => {
   const { className, inset, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Item
@@ -76,7 +76,7 @@ const DropdownMenuItem = (props) => {
   );
 };
 
-const DropdownMenuCheckboxItem = (props) => {
+const DropdownMenuCheckboxItem = (props: any) => {
   const { className, children, checked, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.CheckboxItem
@@ -97,7 +97,7 @@ const DropdownMenuCheckboxItem = (props) => {
   );
 };
 
-const DropdownMenuRadioItem = (props) => {
+const DropdownMenuRadioItem = (props: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.RadioItem
@@ -117,7 +117,7 @@ const DropdownMenuRadioItem = (props) => {
   );
 };
 
-const DropdownMenuLabel = (props) => {
+const DropdownMenuLabel = (props: any) => {
   const { className, inset, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Label
@@ -133,7 +133,7 @@ const DropdownMenuLabel = (props) => {
   );
 };
 
-const DropdownMenuSeparator = (props) => {
+const DropdownMenuSeparator = (props: any) => {
   const { className, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Separator
@@ -143,7 +143,7 @@ const DropdownMenuSeparator = (props) => {
   );
 };
 
-const DropdownMenuShortcut = ({ className, children, ...props }) => {
+const DropdownMenuShortcut = ({ className, children, ...props }: any) => {
   return (
     <span
       className={cn("ml-auto text-xs tracking-widest opacity-60", className)}
