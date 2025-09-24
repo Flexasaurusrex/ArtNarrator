@@ -7,7 +7,7 @@ const Select = SelectPrimitive.Root
 const SelectGroup = SelectPrimitive.Group
 const SelectValue = SelectPrimitive.Value
 
-const SelectTrigger = React.forwardRef((props, ref) => {
+const SelectTrigger = React.forwardRef((props: any, ref: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <SelectPrimitive.Trigger
@@ -27,7 +27,7 @@ const SelectTrigger = React.forwardRef((props, ref) => {
 });
 SelectTrigger.displayName = "SelectTrigger";
 
-const SelectScrollUpButton = React.forwardRef((props, ref) => {
+const SelectScrollUpButton = React.forwardRef((props: any, ref: any) => {
   const { className, ...otherProps } = props;
   return (
     <SelectPrimitive.ScrollUpButton
@@ -44,7 +44,7 @@ const SelectScrollUpButton = React.forwardRef((props, ref) => {
 });
 SelectScrollUpButton.displayName = "SelectScrollUpButton";
 
-const SelectScrollDownButton = React.forwardRef((props, ref) => {
+const SelectScrollDownButton = React.forwardRef((props: any, ref: any) => {
   const { className, ...otherProps } = props;
   return (
     <SelectPrimitive.ScrollDownButton
@@ -61,7 +61,7 @@ const SelectScrollDownButton = React.forwardRef((props, ref) => {
 });
 SelectScrollDownButton.displayName = "SelectScrollDownButton";
 
-const SelectContent = React.forwardRef((props, ref) => {
+const SelectContent = React.forwardRef((props: any, ref: any) => {
   const { className, children, position = "popper", ...otherProps } = props;
   return (
     <SelectPrimitive.Portal>
@@ -93,7 +93,7 @@ const SelectContent = React.forwardRef((props, ref) => {
 });
 SelectContent.displayName = "SelectContent";
 
-const SelectLabel = React.forwardRef((props, ref) => {
+const SelectLabel = React.forwardRef((props: any, ref: any) => {
   const { className, ...otherProps } = props;
   return (
     <SelectPrimitive.Label
@@ -105,7 +105,7 @@ const SelectLabel = React.forwardRef((props, ref) => {
 });
 SelectLabel.displayName = "SelectLabel";
 
-const SelectItem = React.forwardRef((props, ref) => {
+const SelectItem = React.forwardRef((props: any, ref: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <SelectPrimitive.Item
@@ -127,7 +127,7 @@ const SelectItem = React.forwardRef((props, ref) => {
 });
 SelectItem.displayName = "SelectItem";
 
-const SelectSeparator = React.forwardRef((props, ref) => {
+const SelectSeparator = React.forwardRef((props: any, ref: any) => {
   const { className, ...otherProps } = props;
   return (
     <SelectPrimitive.Separator
