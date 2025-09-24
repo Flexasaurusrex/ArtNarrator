@@ -25,7 +25,7 @@ const SelectTrigger = React.forwardRef((props, ref) => {
     </SelectPrimitive.Trigger>
   );
 });
-SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
+SelectTrigger.displayName = "SelectTrigger";
 
 const SelectScrollUpButton = React.forwardRef((props, ref) => {
   const { className, ...otherProps } = props;
@@ -42,7 +42,7 @@ const SelectScrollUpButton = React.forwardRef((props, ref) => {
     </SelectPrimitive.ScrollUpButton>
   );
 });
-SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
+SelectScrollUpButton.displayName = "SelectScrollUpButton";
 
 const SelectScrollDownButton = React.forwardRef((props, ref) => {
   const { className, ...otherProps } = props;
@@ -59,7 +59,7 @@ const SelectScrollDownButton = React.forwardRef((props, ref) => {
     </SelectPrimitive.ScrollDownButton>
   );
 });
-SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
+SelectScrollDownButton.displayName = "SelectScrollDownButton";
 
 const SelectContent = React.forwardRef((props, ref) => {
   const { className, children, position = "popper", ...otherProps } = props;
@@ -91,4 +91,63 @@ const SelectContent = React.forwardRef((props, ref) => {
     </SelectPrimitive.Portal>
   );
 });
-SelectContent.displayName = SelectPrimitive.Content.
+SelectContent.displayName = "SelectContent";
+
+const SelectLabel = React.forwardRef((props, ref) => {
+  const { className, ...otherProps } = props;
+  return (
+    <SelectPrimitive.Label
+      ref={ref}
+      className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold", className)}
+      {...otherProps}
+    />
+  );
+});
+SelectLabel.displayName = "SelectLabel";
+
+const SelectItem = React.forwardRef((props, ref) => {
+  const { className, children, ...otherProps } = props;
+  return (
+    <SelectPrimitive.Item
+      ref={ref}
+      className={cn(
+        "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      )}
+      {...otherProps}
+    >
+      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <Check className="h-4 w-4" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  );
+});
+SelectItem.displayName = "SelectItem";
+
+const SelectSeparator = React.forwardRef((props, ref) => {
+  const { className, ...otherProps } = props;
+  return (
+    <SelectPrimitive.Separator
+      ref={ref}
+      className={cn("-mx-1 my-1 h-px bg-muted", className)}
+      {...otherProps}
+    />
+  );
+});
+SelectSeparator.displayName = "SelectSeparator";
+
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+}
