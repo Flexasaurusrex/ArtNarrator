@@ -30,14 +30,13 @@ export const VideoPreview: React.FC = () => {
     }
 
     const animate = () => {
-      setCurrentTime((prev: number) => {
-        const newTime = prev + (1/30) * playback.playbackRate; // 30fps
-        if (newTime >= totalDuration) {
-          setPlaying(false);
-          return totalDuration;
-        }
-        return newTime;
-      });
+      const newTime = playback.currentTime + (1/30) * playback.playbackRate; // 30fps
+      if (newTime >= totalDuration) {
+        setPlaying(false);
+        setCurrentTime(totalDuration);
+      } else {
+        setCurrentTime(newTime);
+      }
 
       if (playback.isPlaying) {
         animationRef.current = requestAnimationFrame(animate);
