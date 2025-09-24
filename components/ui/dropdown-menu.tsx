@@ -27,10 +27,10 @@ const DropdownMenuSubTrigger = React.forwardRef((props, ref) => {
     </DropdownMenuPrimitive.SubTrigger>
   );
 });
-DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
+DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
 
 const DropdownMenuSubContent = React.forwardRef((props, ref) => {
-  const { className, ...otherProps } = props;
+  const { className, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.SubContent
       ref={ref}
@@ -39,13 +39,15 @@ const DropdownMenuSubContent = React.forwardRef((props, ref) => {
         className
       )}
       {...otherProps}
-    />
+    >
+      {children}
+    </DropdownMenuPrimitive.SubContent>
   );
 });
-DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
+DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
 
 const DropdownMenuContent = React.forwardRef((props, ref) => {
-  const { className, sideOffset = 4, ...otherProps } = props;
+  const { className, sideOffset = 4, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
@@ -56,14 +58,16 @@ const DropdownMenuContent = React.forwardRef((props, ref) => {
           className
         )}
         {...otherProps}
-      />
+      >
+        {children}
+      </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   );
 });
-DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
+DropdownMenuContent.displayName = "DropdownMenuContent";
 
 const DropdownMenuItem = React.forwardRef((props, ref) => {
-  const { className, inset, ...otherProps } = props;
+  const { className, inset, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Item
       ref={ref}
@@ -73,10 +77,12 @@ const DropdownMenuItem = React.forwardRef((props, ref) => {
         className
       )}
       {...otherProps}
-    />
+    >
+      {children}
+    </DropdownMenuPrimitive.Item>
   );
 });
-DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
+DropdownMenuItem.displayName = "DropdownMenuItem";
 
 const DropdownMenuCheckboxItem = React.forwardRef((props, ref) => {
   const { className, children, checked, ...otherProps } = props;
@@ -99,7 +105,7 @@ const DropdownMenuCheckboxItem = React.forwardRef((props, ref) => {
     </DropdownMenuPrimitive.CheckboxItem>
   );
 });
-DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName;
+DropdownMenuCheckboxItem.displayName = "DropdownMenuCheckboxItem";
 
 const DropdownMenuRadioItem = React.forwardRef((props, ref) => {
   const { className, children, ...otherProps } = props;
@@ -121,10 +127,10 @@ const DropdownMenuRadioItem = React.forwardRef((props, ref) => {
     </DropdownMenuPrimitive.RadioItem>
   );
 });
-DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName;
+DropdownMenuRadioItem.displayName = "DropdownMenuRadioItem";
 
 const DropdownMenuLabel = React.forwardRef((props, ref) => {
-  const { className, inset, ...otherProps } = props;
+  const { className, inset, children, ...otherProps } = props;
   return (
     <DropdownMenuPrimitive.Label
       ref={ref}
@@ -134,10 +140,12 @@ const DropdownMenuLabel = React.forwardRef((props, ref) => {
         className
       )}
       {...otherProps}
-    />
+    >
+      {children}
+    </DropdownMenuPrimitive.Label>
   );
 });
-DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
+DropdownMenuLabel.displayName = "DropdownMenuLabel";
 
 const DropdownMenuSeparator = React.forwardRef((props, ref) => {
   const { className, ...otherProps } = props;
@@ -149,14 +157,16 @@ const DropdownMenuSeparator = React.forwardRef((props, ref) => {
     />
   );
 });
-DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
+DropdownMenuSeparator.displayName = "DropdownMenuSeparator";
 
-const DropdownMenuShortcut = ({ className, ...props }) => {
+const DropdownMenuShortcut = ({ className, children, ...props }) => {
   return (
     <span
       className={cn("ml-auto text-xs tracking-widest opacity-60", className)}
       {...props}
-    />
+    >
+      {children}
+    </span>
   );
 };
 DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
