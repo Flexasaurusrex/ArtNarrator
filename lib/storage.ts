@@ -1,5 +1,5 @@
-import AWS from 'aws-sdk';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import AWS from 'aws-sdk';
 import { join } from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -41,7 +41,7 @@ class SupabaseStorageAdapter implements StorageAdapter {
     const supabaseKey = process.env.SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase URL and ANON KEY are required');
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required');
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
@@ -57,6 +57,7 @@ class SupabaseStorageAdapter implements StorageAdapter {
       });
 
     if (error) {
+      console.error('Supabase upload error:', error);
       throw new Error(`Supabase upload failed: ${error.message}`);
     }
 
@@ -68,7 +69,10 @@ class SupabaseStorageAdapter implements StorageAdapter {
   }
 
   async delete(url: string): Promise<void> {
-    const filename = url.split('/').pop();
+    // Extract filename from URL
+    const urlParts = url.split('/');
+    const filename = urlParts[urlParts.length - 1];
+    
     if (!filename) return;
 
     const { error } = await this.supabase.storage
@@ -120,7 +124,6 @@ class S3StorageAdapter implements StorageAdapter {
   }
 }
 
-// Factory function to create storage adapter based on environment
 export function createStorageAdapter(): StorageAdapter {
   const storageType = process.env.STORAGE_TYPE || 'local';
 
