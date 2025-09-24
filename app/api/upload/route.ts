@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const buffer = new Uint8Array(bytes);
 
     // Generate unique filename
     const timestamp = Date.now();
@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
     const filename = `image_${timestamp}_${randomSuffix}.jpg`;
 
     // Process image with Sharp (resize, optimize)
-    let processedBuffer = buffer;
+    let processedBuffer: Buffer = Buffer.from(buffer);
     if (file.type !== 'image/svg+xml') {
-      processedBuffer = await sharp(Buffer.from(buffer))
+      processedBuffer = await sharp(buffer)
         .resize(1920, 1080, { 
           fit: 'inside', 
           withoutEnlargement: true 
