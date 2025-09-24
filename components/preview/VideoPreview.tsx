@@ -372,7 +372,6 @@ export const VideoPreview: React.FC = () => {
                   width: `${dimensions.width}px`,
                   height: `${dimensions.height}px`,
                   maxWidth: '100%',
-                  height: 'auto',
                 }}
                 className="block rounded-lg"
               />
