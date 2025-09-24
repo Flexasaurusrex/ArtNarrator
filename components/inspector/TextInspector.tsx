@@ -1,347 +1,520 @@
-'use client';
-
 import React from 'react';
-import { useAppStore, useSelectedScenes } from '@/lib/store';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
-import { Palette, Eye, AlertTriangle } from 'lucide-react';
+import { Type, Palette, Plus, Trash2, Copy, Eye } from 'lucide-react';
+import { useAppStore } from '@/lib/store';
+import type { TextStyle, CreateTextStyle } from '@/lib/schemas';
 
-export function TextInspector() {
+export const TextInspector: React.FC = () => {
   const { 
     textStyles, 
     addTextStyle, 
     updateTextStyle, 
-    currentProject 
+    deleteTextStyle,
+    scenes,
+    updateScene,
+    timeline: { selectedSceneIds }
   } = useAppStore();
-  
-  const selectedScenes = useSelectedScenes();
-  const scene = selectedScenes[0];
-  
-  // Get current text style
-  const currentStyle = scene?.textStyleId 
-    ? textStyles.find(ts => ts.id === scene.textStyleId)
+
+  const selectedScene = scenes.find(s => selectedSceneIds.includes(s.id!));
+  const currentTextStyle = selectedScene?.textStyleId 
+    ? textStyles.find(s => s.id === selectedScene.textStyleId)
     : textStyles[0];
 
-  const handleUpdateStyle = (field: string, value: any) => {
-    if (currentStyle) {
-      updateTextStyle(currentStyle.id!, { [field]: value });
+  const handleStyleUpdate = (field: keyof TextStyle, value: any) => {
+    if (currentTextStyle?.id) {
+      updateTextStyle(currentTextStyle.id, { [field]: value });
     }
   };
 
   const handleCreateStyle = () => {
-    if (currentProject) {
-      addTextStyle({
-        projectId: currentProject.id!,
-        name: `Style ${textStyles.length + 1}`,
-        titleFont: 'Inter',
-        bodyFont: 'Inter',
-        titleSize: 64,
-        bodySize: 44,
-        weight: '600',
-        align: 'left',
-        shadow: 0.4,
-        outline: 2,
-        color: '#ffffff',
-        bgBlur: 0,
-        bgOpacity: 0,
-        padding: 32,
-      });
+    const newStyle: CreateTextStyle = {
+      projectId: '',
+      name: `Style ${textStyles.length + 1}`,
+      titleFont: 'Inter',
+      bodyFont: 'Inter',
+      titleSize: 64,
+      bodySize: 36,
+      weight: '600',
+      align: 'left',
+      shadow: 0.4,
+      outline: 2,
+      color: '#ffffff',
+      bgBlur: 0,
+      bgOpacity: 0,
+      padding: 32,
+    };
+    addTextStyle(newStyle);
+  };
+
+  const handleApplyToScene = (styleId: string) => {
+    if (selectedScene?.id) {
+      updateScene(selectedScene.id, { textStyleId: styleId });
     }
   };
 
-  // Contrast calculation (simplified)
-  const getContrastRatio = (color: string) => {
-    // This is a simplified contrast calculation
-    // In production, use a proper color contrast library
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance < 0.5 ? 'AAA' : 'AA'; // Simplified rating
+  const fonts = [
+    'Inter',
+    'Arial',
+    'Helvetica',
+    'Times New Roman',
+    'Georgia',
+    'Courier New',
+    'Verdana',
+    'Roboto',
+    'Open Sans',
+    'Lato',
+  ];
+
+  const weights = [
+    { value: '400', label: 'Regular' },
+    { value: '600', label: 'Semi Bold' },
+    { value: '700', label: 'Bold' },
+    { value: '800', label: 'Extra Bold' },
+  ];
+
+  const alignments = [
+    { value: 'left', label: 'Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'right', label: 'Right' },
+  ];
+
+  const previewText = {
+    title: selectedScene?.title || 'Sample Title Text',
+    body: selectedScene?.body || 'This is sample body text that shows how your typography will look in the final video.',
   };
 
-  if (!currentStyle) {
-    return (
-      <div className="space-y-4">
-        <div className="text-center py-8">
-          <p className="text-muted-foreground mb-4">No text style selected</p>
-          <Button onClick={handleCreateStyle}>
-            <Palette className="w-4 h-4 mr-2" />
-            Create Style
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const contrastRating = getContrastRatio(currentStyle.color);
-
   return (
-    <div className="space-y-4">
-      {/* Style Selector */}
-      <Card>
-        <CardHeader className="pb-3">
+    <div className="space-y-6">
+      {/* Text Styles List */}
+      <Card className="bg-gray-800 border-gray-700">
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm">Text Style</CardTitle>
-            <Button variant="ghost" size="sm" onClick={handleCreateStyle}>
-              <Palette className="w-4 h-4" />
+            <CardTitle className="text-gray-100 flex items-center gap-2">
+              <Type className="h-5 w-5" />
+              Text Styles ({textStyles.length})
+            </CardTitle>
+            <Button
+              size="sm"
+              onClick={handleCreateStyle}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Style
             </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <Select 
-            value={currentStyle.id} 
-            onValueChange={(styleId) => {
-              // Apply style to selected scene
-              if (scene) {
-                useAppStore.getState().updateScene(scene.id!, { textStyleId: styleId });
-              }
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {textStyles.map(style => (
-                <SelectItem key={style.id} value={style.id!}>
-                  {style.name}
-                </SelectItem>
+          {textStyles.length > 0 ? (
+            <div className="space-y-2">
+              {textStyles.map((style) => (
+                <div
+                  key={style.id}
+                  className={`p-3 rounded-md border transition-colors ${
+                    currentTextStyle?.id === style.id
+                      ? 'border-blue-500 bg-blue-500/10'
+                      : 'border-gray-600 bg-gray-700 hover:bg-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <div className="font-medium text-gray-200">
+                            {style.name}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {style.titleFont} • {style.weight} • {style.align}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => selectedScene && style.id && handleApplyToScene(style.id)}
+                        disabled={!selectedScene}
+                        className="h-8 px-2 text-xs hover:bg-blue-600"
+                      >
+                        Apply
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          const newStyle = { ...style, name: `${style.name} Copy`, id: undefined };
+                          addTextStyle(newStyle);
+                        }}
+                        className="h-8 w-8 p-0 hover:bg-gray-500"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => style.id && deleteTextStyle(style.id)}
+                        className="h-8 w-8 p-0 hover:bg-red-600"
+                        disabled={textStyles.length <= 1}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </SelectContent>
-          </Select>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Type className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No text styles created yet</p>
+              <p className="text-sm">Create a style to customize typography</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Typography */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Typography</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Title Font</Label>
-              <Select value={currentStyle.titleFont} onValueChange={(value) => handleUpdateStyle('titleFont', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Inter">Inter</SelectItem>
-                  <SelectItem value="Source Serif Pro">Source Serif Pro</SelectItem>
-                  <SelectItem value="JetBrains Mono">JetBrains Mono</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Body Font</Label>
-              <Select value={currentStyle.bodyFont} onValueChange={(value) => handleUpdateStyle('bodyFont', value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Inter">Inter</SelectItem>
-                  <SelectItem value="Source Serif Pro">Source Serif Pro</SelectItem>
-                  <SelectItem value="JetBrains Mono">JetBrains Mono</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Title Size</Label>
-              <div className="flex items-center space-x-2">
-                <Slider
-                  value={[currentStyle.titleSize]}
-                  onValueChange={([value]) => handleUpdateStyle('titleSize', value)}
-                  min={28}
-                  max={120}
-                  step={4}
-                  className="flex-1"
-                />
-                <span className="text-sm w-10">{currentStyle.titleSize}px</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Body Size</Label>
-              <div className="flex items-center space-x-2">
-                <Slider
-                  value={[currentStyle.bodySize]}
-                  onValueChange={([value]) => handleUpdateStyle('bodySize', value)}
-                  min={16}
-                  max={80}
-                  step={2}
-                  className="flex-1"
-                />
-                <span className="text-sm w-10">{currentStyle.bodySize}px</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Font Weight</Label>
-            <Select value={currentStyle.weight} onValueChange={(value) => handleUpdateStyle('weight', value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="400">Regular</SelectItem>
-                <SelectItem value="600">Semi Bold</SelectItem>
-                <SelectItem value="700">Bold</SelectItem>
-                <SelectItem value="800">Extra Bold</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Text Alignment</Label>
-            <Select value={currentStyle.align} onValueChange={(value) => handleUpdateStyle('align', value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="left">Left</SelectItem>
-                <SelectItem value="center">Center</SelectItem>
-                <SelectItem value="right">Right</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Visual Effects */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Visual Effects</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Text Color</Label>
-            <div className="flex items-center space-x-2">
-              <Input
-                type="color"
-                value={currentStyle.color}
-                onChange={(e) => handleUpdateStyle('color', e.target.value)}
-                className="w-12 h-10 p-1 rounded"
-              />
-              <Input
-                value={currentStyle.color}
-                onChange={(e) => handleUpdateStyle('color', e.target.value)}
-                placeholder="#ffffff"
-                className="flex-1"
-              />
-              <Badge variant={contrastRating === 'AAA' ? 'default' : 'secondary'}>
-                {contrastRating}
-              </Badge>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Text Shadow</Label>
-            <div className="flex items-center space-x-2">
-              <Slider
-                value={[currentStyle.shadow]}
-                onValueChange={([value]) => handleUpdateStyle('shadow', value)}
-                min={0}
-                max={1}
-                step={0.1}
-                className="flex-1"
-              />
-              <span className="text-sm w-12">{Math.round(currentStyle.shadow * 100)}%</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Text Outline</Label>
-            <div className="flex items-center space-x-2">
-              <Slider
-                value={[currentStyle.outline]}
-                onValueChange={([value]) => handleUpdateStyle('outline', value)}
-                min={0}
-                max={8}
-                step={1}
-                className="flex-1"
-              />
-              <span className="text-sm w-12">{currentStyle.outline}px</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Background Blur</Label>
-            <div className="flex items-center space-x-2">
-              <Slider
-                value={[currentStyle.bgBlur]}
-                onValueChange={([value]) => handleUpdateStyle('bgBlur', value)}
-                min={0}
-                max={1}
-                step={0.1}
-                className="flex-1"
-              />
-              <span className="text-sm w-12">{Math.round(currentStyle.bgBlur * 100)}%</span>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Background Opacity</Label>
-            <div className="flex items-center space-x-2">
-              <Slider
-                value={[currentStyle.bgOpacity]}
-                onValueChange={([value]) => handleUpdateStyle('bgOpacity', value)}
-                min={0}
-                max={1}
-                step={0.1}
-                className="flex-1"
-              />
-              <span className="text-sm w-12">{Math.round(currentStyle.bgOpacity * 100)}%</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Accessibility Check */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm flex items-center">
-            <Eye className="w-4 h-4 mr-2" />
-            Accessibility
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Contrast Ratio</span>
-              <Badge variant={contrastRating === 'AAA' ? 'default' : 'secondary'}>
-                {contrastRating}
-              </Badge>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Minimum Font Size</span>
-              <Badge variant={currentStyle.bodySize >= 28 ? 'default' : 'destructive'}>
-                {currentStyle.bodySize >= 28 ? '✓' : '✗'}
-              </Badge>
-            </div>
-            
-            {(contrastRating !== 'AAA' || currentStyle.bodySize < 28) && (
-              <div className="flex items-start space-x-2 p-2 bg-muted rounded">
-                <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5" />
-                <div className="text-xs text-muted-foreground">
-                  Consider improving contrast or increasing font size for better accessibility.
+      {/* Style Editor */}
+      {currentTextStyle && (
+        <>
+          {/* Preview */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-gray-100 text-sm flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Preview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div 
+                className="relative bg-gray-900 rounded-lg p-8 min-h-[200px] flex flex-col justify-center"
+                style={{
+                  backgroundColor: '#1a1a1a',
+                  backgroundImage: selectedScene?.imageUrl 
+                    ? `linear-gradient(rgba(0,0,0,${currentTextStyle.bgOpacity}), rgba(0,0,0,${currentTextStyle.bgOpacity})), url(${selectedScene.imageUrl})`
+                    : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backdropFilter: currentTextStyle.bgBlur > 0 ? `blur(${currentTextStyle.bgBlur * 10}px)` : undefined,
+                }}
+              >
+                <div 
+                  style={{ 
+                    textAlign: currentTextStyle.align as any,
+                    padding: `${currentTextStyle.padding}px`,
+                  }}
+                >
+                  {/* Title */}
+                  <div
+                    style={{
+                      fontFamily: currentTextStyle.titleFont,
+                      fontSize: `${Math.max(24, currentTextStyle.titleSize * 0.4)}px`,
+                      fontWeight: currentTextStyle.weight,
+                      color: currentTextStyle.color,
+                      textShadow: currentTextStyle.shadow > 0 
+                        ? `0 2px ${currentTextStyle.shadow * 10}px rgba(0,0,0,0.8)`
+                        : undefined,
+                      WebkitTextStroke: currentTextStyle.outline > 0 
+                        ? `${currentTextStyle.outline * 0.5}px rgba(0,0,0,0.5)`
+                        : undefined,
+                      marginBottom: '12px',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {previewText.title}
+                  </div>
+                  
+                  {/* Body */}
+                  <div
+                    style={{
+                      fontFamily: currentTextStyle.bodyFont,
+                      fontSize: `${Math.max(14, currentTextStyle.bodySize * 0.4)}px`,
+                      fontWeight: currentTextStyle.weight,
+                      color: currentTextStyle.color,
+                      textShadow: currentTextStyle.shadow > 0 
+                        ? `0 1px ${currentTextStyle.shadow * 6}px rgba(0,0,0,0.8)`
+                        : undefined,
+                      WebkitTextStroke: currentTextStyle.outline > 0 
+                        ? `${currentTextStyle.outline * 0.3}px rgba(0,0,0,0.5)`
+                        : undefined,
+                      lineHeight: 1.4,
+                      opacity: 0.9,
+                    }}
+                  >
+                    {previewText.body}
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Typography Settings */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-gray-100 text-sm">Typography</CardTitle>
+                <Input
+                  value={currentTextStyle.name}
+                  onChange={(e) => handleStyleUpdate('name', e.target.value)}
+                  className="w-32 h-8 bg-gray-700 border-gray-600 text-gray-100 text-xs"
+                  placeholder="Style name"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Title Font</Label>
+                  <select
+                    value={currentTextStyle.titleFont}
+                    onChange={(e) => handleStyleUpdate('titleFont', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {fonts.map((font) => (
+                      <option key={font} value={font}>{font}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Body Font</Label>
+                  <select
+                    value={currentTextStyle.bodyFont}
+                    onChange={(e) => handleStyleUpdate('bodyFont', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {fonts.map((font) => (
+                      <option key={font} value={font}>{font}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Title Size</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="28"
+                      max="120"
+                      value={currentTextStyle.titleSize}
+                      onChange={(e) => handleStyleUpdate('titleSize', parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <Input
+                      type="number"
+                      value={currentTextStyle.titleSize}
+                      onChange={(e) => handleStyleUpdate('titleSize', parseInt(e.target.value) || 28)}
+                      min="28"
+                      max="120"
+                      className="w-16 bg-gray-700 border-gray-600 text-gray-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Body Size</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="16"
+                      max="80"
+                      value={currentTextStyle.bodySize}
+                      onChange={(e) => handleStyleUpdate('bodySize', parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <Input
+                      type="number"
+                      value={currentTextStyle.bodySize}
+                      onChange={(e) => handleStyleUpdate('bodySize', parseInt(e.target.value) || 16)}
+                      min="16"
+                      max="80"
+                      className="w-16 bg-gray-700 border-gray-600 text-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Font Weight</Label>
+                  <select
+                    value={currentTextStyle.weight}
+                    onChange={(e) => handleStyleUpdate('weight', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {weights.map((weight) => (
+                      <option key={weight.value} value={weight.value}>
+                        {weight.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Alignment</Label>
+                  <select
+                    value={currentTextStyle.align}
+                    onChange={(e) => handleStyleUpdate('align', e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {alignments.map((align) => (
+                      <option key={align.value} value={align.value}>
+                        {align.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Visual Effects */}
+          <Card className="bg-gray-800 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-gray-100 text-sm flex items-center gap-2">
+                <Palette className="h-4 w-4" />
+                Visual Effects
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-gray-200">Text Color</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={currentTextStyle.color}
+                    onChange={(e) => handleStyleUpdate('color', e.target.value)}
+                    className="w-12 h-8 rounded border border-gray-600 bg-gray-700 cursor-pointer"
+                  />
+                  <Input
+                    type="text"
+                    value={currentTextStyle.color}
+                    onChange={(e) => handleStyleUpdate('color', e.target.value)}
+                    className="flex-1 bg-gray-700 border-gray-600 text-gray-100"
+                    placeholder="#ffffff"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Drop Shadow</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={currentTextStyle.shadow}
+                      onChange={(e) => handleStyleUpdate('shadow', parseFloat(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <span className="text-xs text-gray-400 min-w-0 w-8">
+                      {Math.round(currentTextStyle.shadow * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Outline Width</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="8"
+                      value={currentTextStyle.outline}
+                      onChange={(e) => handleStyleUpdate('outline', parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <span className="text-xs text-gray-400 min-w-0 w-8">
+                      {currentTextStyle.outline}px
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Background Blur</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={currentTextStyle.bgBlur}
+                      onChange={(e) => handleStyleUpdate('bgBlur', parseFloat(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <span className="text-xs text-gray-400 min-w-0 w-8">
+                      {Math.round(currentTextStyle.bgBlur * 100)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-gray-200">Background Opacity</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={currentTextStyle.bgOpacity}
+                      onChange={(e) => handleStyleUpdate('bgOpacity', parseFloat(e.target.value))}
+                      className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                    />
+                    <span className="text-xs text-gray-400 min-w-0 w-8">
+                      {Math.round(currentTextStyle.bgOpacity * 100)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-200">Padding</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="8"
+                    max="64"
+                    value={currentTextStyle.padding}
+                    onChange={(e) => handleStyleUpdate('padding', parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                  />
+                  <span className="text-xs text-gray-400 min-w-0 w-12">
+                    {currentTextStyle.padding}px
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* CSS for custom slider styling */}
+      <style jsx>{`
+        .slider::-webkit-slider-thumb {
+          appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+        }
+        .slider::-moz-range-thumb {
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+          border: none;
+        }
+      `}</style>
     </div>
   );
-}
+};
