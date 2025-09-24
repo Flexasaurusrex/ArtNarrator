@@ -3,8 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Sparkles, Download } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import type { AIImagePrompt } from '@/lib/schemas';
@@ -131,12 +129,12 @@ export const AIImageGenerator: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="prompt" className="text-gray-200">Prompt</Label>
-            <Textarea
+            <textarea
               id="prompt"
               placeholder="Describe the image you want to create..."
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-gray-100 placeholder:text-gray-400 min-h-[100px]"
+              className="w-full min-h-[100px] px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               maxLength={500}
             />
             <div className="text-xs text-gray-400 text-right">
@@ -147,34 +145,32 @@ export const AIImageGenerator: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-gray-200">Style</Label>
-              <Select value={style} onValueChange={(value: AIImagePrompt['style']) => setStyle(value)}>
-                <SelectTrigger className="bg-gray-700 border-gray-600 text-gray-100">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {styles.map((styleOption) => (
-                    <SelectItem key={styleOption.value} value={styleOption.value}>
-                      {styleOption.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={style}
+                onChange={(e) => setStyle(e.target.value as AIImagePrompt['style'])}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {styles.map((styleOption) => (
+                  <option key={styleOption.value} value={styleOption.value}>
+                    {styleOption.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
               <Label className="text-gray-200">Aspect Ratio</Label>
-              <Select value={aspectRatio} onValueChange={(value: AIImagePrompt['aspectRatio']) => setAspectRatio(value)}>
-                <SelectTrigger className="bg-gray-700 border-gray-600 text-gray-100">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {aspectRatios.map((ratio) => (
-                    <SelectItem key={ratio.value} value={ratio.value}>
-                      {ratio.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <select
+                value={aspectRatio}
+                onChange={(e) => setAspectRatio(e.target.value as AIImagePrompt['aspectRatio'])}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {aspectRatios.map((ratio) => (
+                  <option key={ratio.value} value={ratio.value}>
+                    {ratio.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
