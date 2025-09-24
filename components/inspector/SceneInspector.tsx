@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Upload, Image, Sparkles, Trash2, Copy, Eye, EyeOff } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
-import type { Scene, CreateScene } from '@/lib/schemas';
+import type { Scene, CreateScene, UpdateScene } from '@/lib/schemas';
 
 export const SceneInspector: React.FC = () => {
   const { 
@@ -55,7 +55,8 @@ export const SceneInspector: React.FC = () => {
       }
 
       if (selectedScene?.id) {
-        updateScene(selectedScene.id, { imageUrl: data.data.url });
+        const updateData: UpdateScene = { id: selectedScene.id, imageUrl: data.data.url };
+        updateScene(selectedScene.id, updateData);
       } else {
         // Create new scene with uploaded image
         const newScene: CreateScene = {
@@ -85,7 +86,8 @@ export const SceneInspector: React.FC = () => {
 
   const handleSceneUpdate = (field: keyof Scene, value: any) => {
     if (selectedScene?.id) {
-      updateScene(selectedScene.id, { [field]: value });
+      const updateData: UpdateScene = { id: selectedScene.id, [field]: value };
+      updateScene(selectedScene.id, updateData);
     }
   };
 
