@@ -8,7 +8,7 @@ const DialogTrigger = DialogPrimitive.Trigger
 const DialogPortal = DialogPrimitive.Portal
 const DialogClose = DialogPrimitive.Close
 
-const DialogOverlay = (props) => {
+const DialogOverlay = (props: any) => {
   const { className, ...otherProps } = props;
   return (
     <DialogPrimitive.Overlay
@@ -21,7 +21,7 @@ const DialogOverlay = (props) => {
   );
 };
 
-const DialogContent = (props) => {
+const DialogContent = (props: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <DialogPortal>
@@ -43,7 +43,7 @@ const DialogContent = (props) => {
   );
 };
 
-const DialogHeader = (props) => {
+const DialogHeader = (props: any) => {
   const { className, ...otherProps } = props;
   return (
     <div
@@ -56,7 +56,7 @@ const DialogHeader = (props) => {
   );
 };
 
-const DialogFooter = (props) => {
+const DialogFooter = (props: any) => {
   const { className, ...otherProps } = props;
   return (
     <div
@@ -69,7 +69,7 @@ const DialogFooter = (props) => {
   );
 };
 
-const DialogTitle = (props) => {
+const DialogTitle = (props: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <DialogPrimitive.Title
@@ -84,7 +84,7 @@ const DialogTitle = (props) => {
   );
 };
 
-const DialogDescription = (props) => {
+const DialogDescription = (props: any) => {
   const { className, children, ...otherProps } = props;
   return (
     <DialogPrimitive.Description
