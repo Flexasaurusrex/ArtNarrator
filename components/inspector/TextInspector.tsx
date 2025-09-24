@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Type, Palette, Plus, Trash2, Copy, Eye } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
-import type { TextStyle, CreateTextStyle } from '@/lib/schemas';
+import type { TextStyle, CreateTextStyle, UpdateScene } from '@/lib/schemas';
 
 export const TextInspector: React.FC = () => {
   const { 
@@ -51,7 +51,8 @@ export const TextInspector: React.FC = () => {
 
   const handleApplyToScene = (styleId: string) => {
     if (selectedScene?.id) {
-      updateScene(selectedScene.id, { textStyleId: styleId });
+      const updateData: UpdateScene = { id: selectedScene.id, textStyleId: styleId };
+      updateScene(selectedScene.id, updateData);
     }
   };
 
