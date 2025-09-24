@@ -332,7 +332,7 @@ export const VideoPreview: React.FC = () => {
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-semibold text-gray-100">
-            {currentProject?.name || 'Untitled Project'}
+            {currentProject?.title || 'Untitled Project'}
           </h2>
           <div className="text-sm text-gray-400">
             {currentProject?.aspect} • {currentProject?.fps}fps
