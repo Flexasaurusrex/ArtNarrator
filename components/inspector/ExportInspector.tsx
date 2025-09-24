@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Download, Play, Settings, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
@@ -24,7 +23,6 @@ export const ExportInspector: React.FC = () => {
   const [renderLogs, setRenderLogs] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Update dimensions based on project aspect ratio
   useEffect(() => {
     if (currentProject) {
       const [width, height] = currentProject.aspect.split('x').map(Number);
@@ -77,7 +75,6 @@ export const ExportInspector: React.FC = () => {
 
       const jobId = data.data.jobId;
       
-      // Poll for progress
       const pollInterval = setInterval(async () => {
         try {
           const statusResponse = await fetch(`/api/render/${jobId}`);
@@ -177,7 +174,6 @@ export const ExportInspector: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Render Settings */}
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
           <CardTitle className="text-gray-100 flex items-center gap-2">
@@ -279,7 +275,6 @@ export const ExportInspector: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Export Summary */}
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="pt-6">
           <div className="grid grid-cols-3 gap-4 text-center">
@@ -299,7 +294,6 @@ export const ExportInspector: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Render Control */}
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="pt-6">
           {!isRendering && !exportState.currentRender ? (
@@ -326,7 +320,12 @@ export const ExportInspector: React.FC = () => {
                   Cancel
                 </Button>
               </div>
-              <Progress value={renderProgress} />
+              <div className="w-full bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${renderProgress}%` }}
+                ></div>
+              </div>
               <div className="text-center text-sm text-gray-400">
                 {Math.round(renderProgress)}% complete
               </div>
@@ -357,7 +356,6 @@ export const ExportInspector: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Render Logs */}
       {renderLogs.length > 0 && (
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
@@ -375,7 +373,6 @@ export const ExportInspector: React.FC = () => {
         </Card>
       )}
 
-      {/* Export History */}
       {exportState.renderHistory.length > 0 && (
         <Card className="bg-gray-800 border-gray-700">
           <CardHeader>
