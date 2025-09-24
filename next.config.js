@@ -8,6 +8,7 @@ const nextConfig = {
       'localhost',
       'replicate.delivery',
       'pbxt.replicate.delivery',
+      'images.unsplash.com',
     ],
     remotePatterns: [
       {
@@ -17,6 +18,10 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '**.amazonaws.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.vercel.app',
       },
     ],
   },
