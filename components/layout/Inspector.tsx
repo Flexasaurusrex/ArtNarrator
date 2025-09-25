@@ -1,5 +1,4 @@
 'use client';
-
 import React from 'react';
 import { useAppStore } from '@/lib/store';
 import { SceneInspector } from '@/components/inspector/SceneInspector';
@@ -21,9 +20,9 @@ export function Inspector() {
   ] as const;
 
   return (
-    <div className="panel">
+    <div className="h-full bg-gray-900 flex flex-col">
       {/* Panel Tabs */}
-      <header className="panel-header">
+      <header className="border-b border-gray-700 p-2">
         <div className="flex items-center space-x-1 w-full">
           {panels.map(({ id, icon: Icon, label }) => (
             <Button
@@ -41,7 +40,7 @@ export function Inspector() {
       </header>
 
       {/* Panel Content */}
-      <div className="panel-content">
+      <div className="flex-1 p-4 overflow-y-auto">
         {ui.activePanel === 'scene' && <SceneInspector />}
         {ui.activePanel === 'text' && <TextInspector />}
         {ui.activePanel === 'music' && <MusicInspector />}
