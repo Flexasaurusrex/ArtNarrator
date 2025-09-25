@@ -8,12 +8,12 @@ export const AppLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'projects' | 'templates' | 'styles'>('projects');
 
   return (
-    <div className="app-layout">
+    <div className="h-screen bg-gray-900 text-white overflow-hidden">
       {/* Main Application Layout */}
-      <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
+      <div className="flex h-full">
         
         {/* Sidebar - Project library & presets */}
-        <aside className="app-sidebar">
+        <aside className="w-80 flex-shrink-0">
           <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
         </aside>
 
@@ -26,13 +26,13 @@ export const AppLayout: React.FC = () => {
             </div>
 
             {/* Inspector Panel */}
-            <aside className="w-80 border-l border-gray-700">
+            <aside className="w-80 border-l border-gray-700 flex-shrink-0">
               <Inspector />
             </aside>
           </div>
 
           {/* Timeline at bottom */}
-          <footer className="h-48 border-t border-gray-700">
+          <footer className="h-48 border-t border-gray-700 flex-shrink-0">
             <Timeline />
           </footer>
         </main>
