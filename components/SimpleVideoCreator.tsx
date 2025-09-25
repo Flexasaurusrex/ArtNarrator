@@ -252,7 +252,7 @@ export default function SimpleVideoCreator() {
                         </label>
                         <Slider
                           value={[currentScene.duration]}
-                          onValueChange={([value]) => updateScene(currentScene.id, { duration: value })}
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { duration: value })}
                           min={1}
                           max={15}
                           step={0.5}
@@ -277,7 +277,7 @@ export default function SimpleVideoCreator() {
                         </label>
                         <Slider
                           value={[currentScene.textPosition.x]}
-                          onValueChange={([value]) => updateScene(currentScene.id, { 
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
                             textPosition: { ...currentScene.textPosition, x: value }
                           })}
                           min={10}
@@ -292,7 +292,7 @@ export default function SimpleVideoCreator() {
                         </label>
                         <Slider
                           value={[currentScene.textPosition.y]}
-                          onValueChange={([value]) => updateScene(currentScene.id, { 
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
                             textPosition: { ...currentScene.textPosition, y: value }
                           })}
                           min={10}
