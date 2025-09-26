@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,12 +56,11 @@ export default function SimpleVideoCreator() {
   const [backgroundMusic, setBackgroundMusic] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
   
-  // Enhanced preview state
+  // Simplified preview state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [previewProgress, setPreviewProgress] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [nextScenePreview, setNextScenePreview] = useState<Scene | null>(null);
+  const [showTransition, setShowTransition] = useState(false);
   
   // Overall video duration
   const totalDuration = scenes.reduce((acc, scene) => acc + scene.duration, 0);
@@ -105,46 +104,33 @@ export default function SimpleVideoCreator() {
     updateScene(sceneId, { imageUrl });
   };
 
-  // Reset preview to initial state
-  const resetPreview = () => {
-    setIsPlaying(false);
-    setIsTransitioning(false);
-    setNextScenePreview(null);
-    setPreviewProgress(0);
-    setCurrentPreviewIndex(0);
-  };
-
-  // Enhanced preview functionality with transitions
+  // Simplified preview controls
   const startPreview = () => {
     if (scenes.length === 0) return;
     setIsPlaying(true);
     setCurrentPreviewIndex(0);
     setPreviewProgress(0);
-    setIsTransitioning(false);
-    setNextScenePreview(null);
+    setShowTransition(false);
   };
 
   const stopPreview = () => {
     setIsPlaying(false);
     setPreviewProgress(0);
-    setIsTransitioning(false);
-    setNextScenePreview(null);
+    setShowTransition(false);
+  };
+
+  const resetPreview = () => {
+    setIsPlaying(false);
+    setCurrentPreviewIndex(0);
+    setPreviewProgress(0);
+    setShowTransition(false);
   };
 
   const nextScene = () => {
     if (currentPreviewIndex < scenes.length - 1) {
-      const currentSceneData = scenes[currentPreviewIndex];
-      const transitionDuration = Math.min(currentSceneData.transitionDuration * 1000, 2000); // Max 2 seconds
-      
-      setIsTransitioning(true);
-      setNextScenePreview(scenes[currentPreviewIndex + 1]);
-      
-      setTimeout(() => {
-        setCurrentPreviewIndex(currentPreviewIndex + 1);
-        setPreviewProgress(0);
-        setIsTransitioning(false);
-        setNextScenePreview(null);
-      }, transitionDuration);
+      setCurrentPreviewIndex(currentPreviewIndex + 1);
+      setPreviewProgress(0);
+      setShowTransition(false);
     } else {
       stopPreview();
     }
@@ -152,78 +138,56 @@ export default function SimpleVideoCreator() {
 
   const prevScene = () => {
     if (currentPreviewIndex > 0) {
-      const currentSceneData = scenes[currentPreviewIndex - 1];
-      const transitionDuration = Math.min(currentSceneData.transitionDuration * 1000, 2000);
-      
-      setIsTransitioning(true);
-      setNextScenePreview(scenes[currentPreviewIndex - 1]);
-      
-      setTimeout(() => {
-        setCurrentPreviewIndex(currentPreviewIndex - 1);
-        setPreviewProgress(0);
-        setIsTransitioning(false);
-        setNextScenePreview(null);
-      }, transitionDuration);
+      setCurrentPreviewIndex(currentPreviewIndex - 1);
+      setPreviewProgress(0);
+      setShowTransition(false);
     }
   };
 
-  // FIXED: Auto-advance preview scenes with better transition handling
+  // Fixed main preview logic - simplified and robust
   useEffect(() => {
-    if (!isPlaying || scenes.length === 0 || isTransitioning) return;
+    if (!isPlaying || scenes.length === 0) return;
 
     const currentSceneData = scenes[currentPreviewIndex];
-    if (!currentSceneData) return;
+    if (!currentSceneData) {
+      stopPreview();
+      return;
+    }
 
     const interval = setInterval(() => {
       setPreviewProgress(prev => {
-        // Calculate when to start transition (but not earlier than 80% through scene)
-        const transitionStartPoint = Math.max(80, 100 - (currentSceneData.transitionDuration / currentSceneData.duration * 100));
+        const newProgress = prev + (100 / (currentSceneData.duration * 10));
         
-        // Start transition at calculated point
-        if (prev >= transitionStartPoint && prev < 100 && currentPreviewIndex < scenes.length - 1 && !isTransitioning) {
-          setIsTransitioning(true);
-          setNextScenePreview(scenes[currentPreviewIndex + 1]);
-          
-          // Force transition to complete after maximum duration to prevent freezing
-          setTimeout(() => {
-            if (isTransitioning) { // Only if still transitioning
-              setCurrentPreviewIndex(current => current + 1);
-              setPreviewProgress(0);
-              setIsTransitioning(false);
-              setNextScenePreview(null);
-            }
-          }, Math.min(currentSceneData.transitionDuration * 1000, 3000)); // Max 3 seconds
+        // Show transition effect near the end
+        if (newProgress > 80 && currentPreviewIndex < scenes.length - 1) {
+          setShowTransition(true);
         }
         
-        if (prev >= 100) {
+        // Move to next scene when complete
+        if (newProgress >= 100) {
           if (currentPreviewIndex < scenes.length - 1) {
-            // Only advance if not already transitioning
-            if (!isTransitioning) {
-              setCurrentPreviewIndex(current => current + 1);
-              setPreviewProgress(0);
-            }
+            setCurrentPreviewIndex(currentPreviewIndex + 1);
+            setShowTransition(false);
+            return 0;
           } else {
-            stopPreview();
+            // End of video
+            setIsPlaying(false);
+            setCurrentPreviewIndex(0);
+            setShowTransition(false);
+            return 0;
           }
-          return 0;
         }
-        return Math.min(prev + (100 / (currentSceneData.duration * 10)), 100);
+        
+        return newProgress;
       });
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentPreviewIndex, scenes, isTransitioning]);
+  }, [isPlaying, currentPreviewIndex, scenes]);
 
   const exportVideo = async () => {
     if (scenes.length === 0) {
       alert('Add at least one scene before exporting');
-      return;
-    }
-
-    // Check if scenes have images
-    const scenesWithImages = scenes.filter(scene => scene.imageUrl);
-    if (scenesWithImages.length === 0) {
-      alert('Please add images to your scenes before exporting');
       return;
     }
 
@@ -262,38 +226,9 @@ export default function SimpleVideoCreator() {
 
   // Show the right scene in preview
   const sceneToShow = isPlaying ? scenes[currentPreviewIndex] : currentScene;
-  
-  const getTransitionClasses = (scene: Scene, isNext = false) => {
-    if (!scene) return "absolute inset-0 w-full h-full opacity-0";
-    
-    const baseClasses = "absolute inset-0 w-full h-full transition-all";
-    const intensity = Math.min(scene.transitionIntensity / 100, 2); // Cap at 200%
-    const duration = Math.min(scene.transitionDuration * 1000, 3000); // Cap at 3 seconds
-    
-    if (!isTransitioning) {
-      return `${baseClasses} ${isNext ? 'opacity-0' : 'opacity-100'}`;
-    }
-    
-    const transitionStyle = `duration-${duration}`;
-    
-    switch (scene.transition) {
-      case 'fade':
-        return `${baseClasses} transition-opacity duration-1000 ${isNext ? 'opacity-100' : `opacity-${Math.max(0, Math.round((1-intensity)*100))}`}`;
-      case 'slide-left':
-        return `${baseClasses} transition-transform duration-1000 ${isNext ? 'translate-x-0' : '-translate-x-full'}`;
-      case 'slide-right':
-        return `${baseClasses} transition-transform duration-1000 ${isNext ? 'translate-x-0' : 'translate-x-full'}`;
-      case 'zoom-in':
-        return `${baseClasses} transition-all duration-1000 ${isNext ? 'scale-100 opacity-100' : `scale-${Math.round(100 + intensity*50)} opacity-0`}`;
-      case 'zoom-out':
-        return `${baseClasses} transition-all duration-1000 ${isNext ? 'scale-100 opacity-100' : `scale-${Math.max(50, Math.round(100 - intensity*50))} opacity-0`}`;
-      case 'dissolve':
-        const blurAmount = Math.round(intensity * 4);
-        return `${baseClasses} transition-all duration-1000 ${isNext ? 'opacity-100 blur-0' : `opacity-0 blur-[${blurAmount}px]`}`;
-      default:
-        return `${baseClasses} ${isNext ? '' : 'hidden'}`;
-    }
-  };
+  const nextSceneToShow = isPlaying && showTransition && currentPreviewIndex < scenes.length - 1 
+    ? scenes[currentPreviewIndex + 1] 
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
@@ -340,7 +275,6 @@ export default function SimpleVideoCreator() {
                     key={scene.id}
                     onClick={() => {
                       setCurrentScene(scene);
-                      // If not playing, update preview to show this scene
                       if (!isPlaying) {
                         setCurrentPreviewIndex(index);
                       }
@@ -430,7 +364,7 @@ export default function SimpleVideoCreator() {
                         variant="outline" 
                         size="sm"
                         onClick={resetPreview}
-                        title="Reset preview to beginning"
+                        title="Reset Preview"
                       >
                         <RotateCcw className="w-4 h-4" />
                       </Button>
@@ -438,9 +372,11 @@ export default function SimpleVideoCreator() {
                   </CardHeader>
                   <CardContent>
                     <div className="relative aspect-video bg-black rounded overflow-hidden">
-                      {/* Current/Selected Scene */}
+                      {/* Current Scene */}
                       {sceneToShow?.imageUrl && (
-                        <div className={getTransitionClasses(sceneToShow, false)}>
+                        <div className={`absolute inset-0 transition-all duration-1000 ${
+                          showTransition ? 'opacity-50 scale-105' : 'opacity-100 scale-100'
+                        }`}>
                           <img 
                             src={sceneToShow.imageUrl}
                             alt="Current Scene"
@@ -448,9 +384,7 @@ export default function SimpleVideoCreator() {
                           />
                           {/* Text Overlay */}
                           <div 
-                            className={`absolute px-4 py-2 rounded max-w-[80%] transition-all duration-500 ${
-                              isPlaying && !isTransitioning ? 'opacity-100' : 'opacity-80'
-                            }`}
+                            className="absolute px-4 py-2 rounded max-w-[80%] transition-all duration-500"
                             style={{
                               left: `${sceneToShow.textPosition.x}%`,
                               top: `${sceneToShow.textPosition.y}%`,
@@ -470,31 +404,31 @@ export default function SimpleVideoCreator() {
                         </div>
                       )}
                       
-                      {/* Next Scene (during transitions) */}
-                      {nextScenePreview?.imageUrl && isTransitioning && (
-                        <div className={getTransitionClasses(nextScenePreview, true)}>
+                      {/* Transition Preview - Next Scene */}
+                      {nextSceneToShow?.imageUrl && showTransition && (
+                        <div className="absolute inset-0 transition-all duration-1000 opacity-50">
                           <img 
-                            src={nextScenePreview.imageUrl}
+                            src={nextSceneToShow.imageUrl}
                             alt="Next Scene"
                             className="w-full h-full object-cover"
                           />
                           <div 
-                            className="absolute px-4 py-2 rounded max-w-[80%] opacity-100"
+                            className="absolute px-4 py-2 rounded max-w-[80%]"
                             style={{
-                              left: `${nextScenePreview.textPosition.x}%`,
-                              top: `${nextScenePreview.textPosition.y}%`,
+                              left: `${nextSceneToShow.textPosition.x}%`,
+                              top: `${nextSceneToShow.textPosition.y}%`,
                               transform: 'translate(-50%, -50%)',
-                              fontSize: `${nextScenePreview.textStyle.fontSize}px`,
-                              fontFamily: nextScenePreview.textStyle.fontFamily,
-                              color: nextScenePreview.textStyle.color,
-                              backgroundColor: nextScenePreview.textStyle.backgroundColor + Math.round(nextScenePreview.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0'),
-                              fontWeight: nextScenePreview.textStyle.fontWeight,
-                              textAlign: nextScenePreview.textStyle.textAlign as any,
-                              backdropFilter: nextScenePreview.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none'
+                              fontSize: `${nextSceneToShow.textStyle.fontSize}px`,
+                              fontFamily: nextSceneToShow.textStyle.fontFamily,
+                              color: nextSceneToShow.textStyle.color,
+                              backgroundColor: nextSceneToShow.textStyle.backgroundColor + Math.round(nextSceneToShow.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0'),
+                              fontWeight: nextSceneToShow.textStyle.fontWeight,
+                              textAlign: nextSceneToShow.textStyle.textAlign as any,
+                              backdropFilter: nextSceneToShow.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none'
                             }}
                           >
-                            <div className="font-bold mb-1">{nextScenePreview.title}</div>
-                            <div className="text-sm leading-tight">{nextScenePreview.description}</div>
+                            <div className="font-bold mb-1">{nextSceneToShow.title}</div>
+                            <div className="text-sm leading-tight">{nextSceneToShow.description}</div>
                           </div>
                         </div>
                       )}
@@ -523,9 +457,9 @@ export default function SimpleVideoCreator() {
                             style={{ width: `${previewProgress}%` }}
                           />
                         </div>
-                        {isTransitioning && (
+                        {showTransition && (
                           <div className="text-center text-yellow-400 text-sm">
-                            Transitioning ({sceneToShow?.transition}) - {sceneToShow?.transitionDuration}s @ {sceneToShow?.transitionIntensity}% intensity
+                            Transitioning to next scene...
                           </div>
                         )}
                       </div>
@@ -533,7 +467,7 @@ export default function SimpleVideoCreator() {
                   </CardContent>
                 </Card>
 
-                {/* Enhanced Scene Settings */}
+                {/* Scene Settings */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
                   {/* Content Panel */}
@@ -613,7 +547,6 @@ export default function SimpleVideoCreator() {
                         </Select>
                       </div>
 
-                      {/* Transition Controls */}
                       <div className="bg-yellow-900/20 p-3 rounded border border-yellow-600/30">
                         <div className="flex items-center mb-2">
                           <Zap className="w-4 h-4 mr-1 text-yellow-400" />
