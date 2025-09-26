@@ -62,10 +62,14 @@ export default function SimpleVideoCreator() {
   const [previewProgress, setPreviewProgress] = useState(0);
   const [showTransition, setShowTransition] = useState(false);
   
-  // Video recording
+  // Video recording and conversion
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  
+  // Conversion state
+  const [isConverting, setIsConverting] = useState(false);
+  const [conversionProgress, setConversionProgress] = useState(0);
   
   // Overall video duration
   const totalDuration = scenes.reduce((acc, scene) => acc + scene.duration, 0);
@@ -215,7 +219,63 @@ export default function SimpleVideoCreator() {
     }
   };
 
-  // FIXED: Real video export using MediaRecorder
+  // CloudConvert integration for WebM to MP4 conversion
+  const convertToMP4 = async (webmBlob: Blob) => {
+    setIsConverting(true);
+    setConversionProgress(0);
+
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', webmBlob, 'video.webm');
+      formData.append('inputformat', 'webm');
+      formData.append('outputformat', 'mp4');
+      formData.append('options[video_codec]', 'libx264');
+      formData.append('options[audio_codec]', 'aac');
+      formData.append('options[preset]', 'fast');
+
+      // Use CloudConvert's free conversion endpoint
+      // Note: For production, you'd want to use their proper API with authentication
+      const response = await fetch('https://api.cloudconvert.com/v2/convert', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Conversion service temporarily unavailable');
+      }
+
+      const result = await response.blob();
+      
+      setConversionProgress(100);
+      
+      // Download the converted MP4
+      const url = URL.createObjectURL(result);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `video-essay-${Date.now()}.mp4`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      alert('Video successfully converted to MP4!\nReady for social media upload.');
+
+    } catch (error) {
+      console.error('Conversion failed:', error);
+      
+      // Fallback: offer WebM download with conversion suggestion
+      const url = URL.createObjectURL(webmBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `video-essay-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      alert(`Conversion to MP4 failed. Downloaded WebM file instead.\n\nTo convert for social media:\n1. Visit cloudconvert.com\n2. Upload your WebM file\n3. Convert to MP4\n4. Download and share!`);
+    }
+
+    setIsConverting(false);
+    setConversionProgress(0);
+  };
   const exportVideo = async () => {
     if (scenes.length === 0) {
       alert('Add at least one scene before exporting');
@@ -245,12 +305,18 @@ export default function SimpleVideoCreator() {
       canvas.width = 1080;
       canvas.height = 1920;
 
-      // Set up MediaRecorder
+      // Set up MediaRecorder with MP4 support
       const stream = canvas.captureStream(30); // 30 FPS
       chunksRef.current = [];
       
+      // Try MP4 first (for social media compatibility), fallback to WebM
+      let mimeType = 'video/mp4';
+      if (!MediaRecorder.isTypeSupported('video/mp4')) {
+        mimeType = 'video/webm;codecs=vp8';
+      }
+      
       mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=vp9'
+        mimeType: mimeType
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -260,16 +326,11 @@ export default function SimpleVideoCreator() {
       };
 
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
+        const webmBlob = new Blob(chunksRef.current, { type: 'video/webm' });
         
-        // Download the video
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `video-essay-${Date.now()}.webm`;
-        a.click();
+        // Automatically convert to MP4 for social media compatibility
+        convertToMP4(webmBlob);
         
-        URL.revokeObjectURL(url);
         setIsExporting(false);
       };
 
