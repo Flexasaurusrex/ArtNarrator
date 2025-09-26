@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward, Clock, Zap, RotateCcw } from 'lucide-react';
+import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward, Clock, Zap, RotateCcw, Monitor, Smartphone } from 'lucide-react';
 
 interface Scene {
   id: string;
@@ -50,13 +50,20 @@ const FONTS = [
   { value: 'Helvetica', label: 'Helvetica' }
 ];
 
+const ORIENTATIONS = [
+  { value: 'vertical', label: 'Vertical (9:16)', width: 1080, height: 1920 },
+  { value: 'horizontal', label: 'Horizontal (16:9)', width: 1920, height: 1080 },
+  { value: 'square', label: 'Square (1:1)', width: 1080, height: 1080 }
+];
+
 export default function SimpleVideoCreator() {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [currentScene, setCurrentScene] = useState<Scene | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
+  const [orientation, setOrientation] = useState('vertical');
   
-  // Simplified preview state
+  // Fixed preview state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [previewProgress, setPreviewProgress] = useState(0);
@@ -73,6 +80,9 @@ export default function SimpleVideoCreator() {
   
   // Overall video duration
   const totalDuration = scenes.reduce((acc, scene) => acc + scene.duration, 0);
+
+  // Get current orientation settings
+  const currentOrientation = ORIENTATIONS.find(o => o.value === orientation) || ORIENTATIONS[0];
 
   const addScene = () => {
     const newScene: Scene = {
@@ -155,7 +165,7 @@ export default function SimpleVideoCreator() {
     }
   };
 
-  // FIXED: Simple, working preview logic
+  // FIXED: Working preview logic with transitions
   useEffect(() => {
     if (!isPlaying || scenes.length === 0) return;
 
@@ -169,7 +179,7 @@ export default function SimpleVideoCreator() {
       setPreviewProgress(prev => {
         const newProgress = prev + (100 / (currentSceneData.duration * 10));
         
-        // Simple transition preview near the end
+        // Show transition effect near the end
         if (newProgress > 85 && currentPreviewIndex < scenes.length - 1) {
           setShowTransition(true);
         }
@@ -181,7 +191,10 @@ export default function SimpleVideoCreator() {
             setShowTransition(false);
             return 0;
           } else {
-            stopPreview();
+            // End of video
+            setIsPlaying(false);
+            setCurrentPreviewIndex(0);
+            setShowTransition(false);
             return 0;
           }
         }
@@ -203,7 +216,7 @@ export default function SimpleVideoCreator() {
 
     switch (scene.transition) {
       case 'fade':
-        return isNext ? 'opacity-50' : 'opacity-50';
+        return isNext ? 'opacity-70' : 'opacity-70';
       case 'slide-left':
         return isNext ? 'translate-x-8 opacity-80' : '-translate-x-2 opacity-90';
       case 'slide-right':
@@ -276,6 +289,8 @@ export default function SimpleVideoCreator() {
     setIsConverting(false);
     setConversionProgress(0);
   };
+
+  // Enhanced export with proper dimensions
   const exportVideo = async () => {
     if (scenes.length === 0) {
       alert('Add at least one scene before exporting');
@@ -301,22 +316,16 @@ export default function SimpleVideoCreator() {
         throw new Error('Cannot get canvas context');
       }
 
-      // Set up canvas
-      canvas.width = 1080;
-      canvas.height = 1920;
+      // Set up canvas with correct dimensions
+      canvas.width = currentOrientation.width;
+      canvas.height = currentOrientation.height;
 
-      // Set up MediaRecorder with MP4 support
+      // Set up MediaRecorder with correct dimensions
       const stream = canvas.captureStream(30); // 30 FPS
       chunksRef.current = [];
       
-      // Try MP4 first (for social media compatibility), fallback to WebM
-      let mimeType = 'video/mp4';
-      if (!MediaRecorder.isTypeSupported('video/mp4')) {
-        mimeType = 'video/webm;codecs=vp8';
-      }
-      
       mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: mimeType
+        mimeType: 'video/webm;codecs=vp8'
       });
 
       mediaRecorderRef.current.ondataavailable = (event) => {
@@ -362,13 +371,36 @@ export default function SimpleVideoCreator() {
           ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Draw image
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // Draw image to fit canvas dimensions while maintaining aspect ratio
+          const imgAspect = img.width / img.height;
+          const canvasAspect = canvas.width / canvas.height;
+          
+          let drawWidth, drawHeight, drawX, drawY;
+          
+          if (imgAspect > canvasAspect) {
+            // Image is wider, fit to height
+            drawHeight = canvas.height;
+            drawWidth = drawHeight * imgAspect;
+            drawX = (canvas.width - drawWidth) / 2;
+            drawY = 0;
+          } else {
+            // Image is taller, fit to width
+            drawWidth = canvas.width;
+            drawHeight = drawWidth / imgAspect;
+            drawX = 0;
+            drawY = (canvas.height - drawHeight) / 2;
+          }
+
+          ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
           // Draw text overlay
           if (scene.title || scene.description) {
             const x = (scene.textPosition.x / 100) * canvas.width;
             const y = (scene.textPosition.y / 100) * canvas.height;
+
+            // Scale font size based on canvas size
+            const scaleFactor = Math.min(canvas.width / 1080, canvas.height / 1920);
+            const scaledFontSize = scene.textStyle.fontSize * scaleFactor;
 
             // Text background
             if (scene.textStyle.backgroundOpacity > 0) {
@@ -376,12 +408,12 @@ export default function SimpleVideoCreator() {
               ctx.fillStyle = scene.textStyle.backgroundColor + Math.round(alpha * 255).toString(16).padStart(2, '0');
               
               // Measure text to size background
-              ctx.font = `${scene.textStyle.fontWeight} ${scene.textStyle.fontSize}px ${scene.textStyle.fontFamily}`;
+              ctx.font = `${scene.textStyle.fontWeight} ${scaledFontSize}px ${scene.textStyle.fontFamily}`;
               const titleWidth = scene.title ? ctx.measureText(scene.title).width : 0;
               const descWidth = scene.description ? ctx.measureText(scene.description).width : 0;
               const maxWidth = Math.max(titleWidth, descWidth);
               
-              ctx.fillRect(x - maxWidth/2 - 20, y - 40, maxWidth + 40, 80);
+              ctx.fillRect(x - maxWidth/2 - 20, y - 40 * scaleFactor, maxWidth + 40, 80 * scaleFactor);
             }
 
             // Draw text
@@ -389,13 +421,13 @@ export default function SimpleVideoCreator() {
             ctx.textAlign = scene.textStyle.textAlign as CanvasTextAlign;
 
             if (scene.title) {
-              ctx.font = `${scene.textStyle.fontWeight} ${scene.textStyle.fontSize}px ${scene.textStyle.fontFamily}`;
-              ctx.fillText(scene.title, x, y - 10);
+              ctx.font = `${scene.textStyle.fontWeight} ${scaledFontSize}px ${scene.textStyle.fontFamily}`;
+              ctx.fillText(scene.title, x, y - 10 * scaleFactor);
             }
             
             if (scene.description) {
-              ctx.font = `normal ${scene.textStyle.fontSize * 0.75}px ${scene.textStyle.fontFamily}`;
-              ctx.fillText(scene.description, x, y + 25);
+              ctx.font = `normal ${scaledFontSize * 0.75}px ${scene.textStyle.fontFamily}`;
+              ctx.fillText(scene.description, x, y + 25 * scaleFactor);
             }
           }
 
@@ -434,24 +466,44 @@ export default function SimpleVideoCreator() {
           <div>
             <h1 className="text-3xl font-bold">Video Essay Creator</h1>
             {totalDuration > 0 && (
-              <p className="text-gray-400 mt-1 flex items-center">
-                <Clock className="w-4 h-4 mr-1" />
-                Total duration: {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toFixed(0).padStart(2, '0')}
-              </p>
+              <div className="flex items-center gap-4 mt-1">
+                <p className="text-gray-400 flex items-center">
+                  <Clock className="w-4 h-4 mr-1" />
+                  Total duration: {Math.floor(totalDuration / 60)}:{(totalDuration % 60).toFixed(0).padStart(2, '0')}
+                </p>
+                <p className="text-gray-400 flex items-center">
+                  {orientation === 'vertical' && <Smartphone className="w-4 h-4 mr-1" />}
+                  {orientation === 'horizontal' && <Monitor className="w-4 h-4 mr-1" />}
+                  {orientation === 'square' && <div className="w-4 h-4 mr-1 border border-gray-400 rounded" />}
+                  {currentOrientation.label}
+                </p>
+              </div>
             )}
           </div>
           <div className="flex gap-3">
+            <Select value={orientation} onValueChange={setOrientation}>
+              <SelectTrigger className="w-48 bg-gray-800 border-gray-600">
+                <SelectValue placeholder="Select orientation" />
+              </SelectTrigger>
+              <SelectContent>
+                {ORIENTATIONS.map(orient => (
+                  <SelectItem key={orient.value} value={orient.value}>
+                    {orient.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button onClick={addScene} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
               Add Scene
             </Button>
             <Button 
               onClick={exportVideo}
-              disabled={scenes.length === 0 || isExporting}
+              disabled={scenes.length === 0 || isExporting || isConverting}
               className="bg-green-600 hover:bg-green-700"
             >
               <Download className="w-4 h-4 mr-2" />
-              {isExporting ? 'Recording Video...' : 'Export Video'}
+              {isExporting ? 'Recording Video...' : isConverting ? `Converting to MP4... ${conversionProgress}%` : 'Export Video'}
             </Button>
           </div>
         </div>
@@ -527,7 +579,7 @@ export default function SimpleVideoCreator() {
             {currentScene ? (
               <div className="space-y-6">
                 
-                {/* FIXED: Working Preview */}
+                {/* FIXED: Working Preview with Transitions */}
                 <Card className="bg-gray-800 border-gray-700">
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-gray-200">Preview</CardTitle>
@@ -566,7 +618,14 @@ export default function SimpleVideoCreator() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="relative aspect-video bg-black rounded overflow-hidden">
+                    <div 
+                      className="relative bg-black rounded overflow-hidden mx-auto"
+                      style={{
+                        aspectRatio: orientation === 'vertical' ? '9/16' : 
+                                   orientation === 'horizontal' ? '16/9' : '1/1',
+                        maxHeight: '400px'
+                      }}
+                    >
                       {/* Current Scene */}
                       {sceneToShow?.imageUrl && (
                         <div className={`absolute inset-0 transition-all duration-1000 ${getTransitionClass(sceneToShow, false)}`}>
@@ -597,7 +656,7 @@ export default function SimpleVideoCreator() {
                         </div>
                       )}
                       
-                      {/* Next Scene (simple transition preview) */}
+                      {/* Next Scene (transition preview) */}
                       {nextSceneToShow?.imageUrl && showTransition && (
                         <div className={`absolute inset-0 transition-all duration-1000 ${getTransitionClass(nextSceneToShow, true)}`}>
                           <img 
