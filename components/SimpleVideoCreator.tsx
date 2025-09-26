@@ -529,3 +529,270 @@ export default function SimpleVideoCreator() {
                           value={currentScene.title}
                           onChange={(e) => updateScene(currentScene.id, { title: e.target.value })}
                           placeholder="Scene title..."
+                          className="bg-gray-700 border-gray-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Description</label>
+                        <Textarea
+                          value={currentScene.description}
+                          onChange={(e) => updateScene(currentScene.id, { description: e.target.value })}
+                          placeholder="Scene narration text..."
+                          rows={3}
+                          className="bg-gray-700 border-gray-600"
+                        />
+                      </div>
+
+                      <div className="bg-gray-700/50 p-3 rounded">
+                        <label className="block text-sm font-medium mb-2 flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Scene Duration: {currentScene.duration}s
+                        </label>
+                        <Slider
+                          value={[currentScene.duration]}
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { duration: value })}
+                          min={1}
+                          max={30}
+                          step={0.5}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Transition Effect</label>
+                        <Select 
+                          value={currentScene.transition} 
+                          onValueChange={(value) => updateScene(currentScene.id, { transition: value })}
+                        >
+                          <SelectTrigger className="bg-gray-700 border-gray-600">
+                            <SelectValue placeholder="Select transition" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TRANSITIONS.map(transition => (
+                              <SelectItem key={transition.value} value={transition.value}>
+                                {transition.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* NEW: Transition Controls */}
+                      <div className="bg-yellow-900/20 p-3 rounded border border-yellow-600/30">
+                        <div className="flex items-center mb-2">
+                          <Zap className="w-4 h-4 mr-1 text-yellow-400" />
+                          <span className="text-sm font-medium text-yellow-200">Transition Settings</span>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs text-gray-300 mb-1">
+                              Duration: {currentScene.transitionDuration}s
+                            </label>
+                            <Slider
+                              value={[currentScene.transitionDuration]}
+                              onValueChange={([value]: number[]) => updateScene(currentScene.id, { transitionDuration: value })}
+                              min={0.2}
+                              max={3.0}
+                              step={0.1}
+                              className="w-full"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs text-gray-300 mb-1">
+                              Intensity: {currentScene.transitionIntensity}%
+                            </label>
+                            <Slider
+                              value={[currentScene.transitionIntensity]}
+                              onValueChange={([value]: number[]) => updateScene(currentScene.id, { transitionIntensity: value })}
+                              min={10}
+                              max={200}
+                              step={10}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Position Panel - Same as before */}
+                  <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-gray-200 flex items-center">
+                        <Type className="w-5 h-5 mr-2" />
+                        Position
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Horizontal: {currentScene.textPosition.x}%
+                        </label>
+                        <Slider
+                          value={[currentScene.textPosition.x]}
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
+                            textPosition: { ...currentScene.textPosition, x: value }
+                          })}
+                          min={10}
+                          max={90}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Vertical: {currentScene.textPosition.y}%
+                        </label>
+                        <Slider
+                          value={[currentScene.textPosition.y]}
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
+                            textPosition: { ...currentScene.textPosition, y: value }
+                          })}
+                          min={10}
+                          max={90}
+                          className="w-full"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => updateScene(currentScene.id, { 
+                            textPosition: { x: 50, y: 20 } 
+                          })}
+                        >
+                          Top
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => updateScene(currentScene.id, { 
+                            textPosition: { x: 50, y: 50 } 
+                          })}
+                        >
+                          Center
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => updateScene(currentScene.id, { 
+                            textPosition: { x: 50, y: 80 } 
+                          })}
+                        >
+                          Bottom
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Text Style Panel - Same as before */}
+                  <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-gray-200 flex items-center">
+                        <Palette className="w-5 h-5 mr-2" />
+                        Text Style
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Font</label>
+                          <Select 
+                            value={currentScene.textStyle.fontFamily} 
+                            onValueChange={(value) => updateScene(currentScene.id, { 
+                              textStyle: { ...currentScene.textStyle, fontFamily: value }
+                            })}
+                          >
+                            <SelectTrigger className="bg-gray-700 border-gray-600">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FONTS.map(font => (
+                                <SelectItem key={font.value} value={font.value}>
+                                  {font.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Size: {currentScene.textStyle.fontSize}px
+                          </label>
+                          <Slider
+                            value={[currentScene.textStyle.fontSize]}
+                            onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
+                              textStyle: { ...currentScene.textStyle, fontSize: value }
+                            })}
+                            min={12}
+                            max={48}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Text Color</label>
+                          <input
+                            type="color"
+                            value={currentScene.textStyle.color}
+                            onChange={(e) => updateScene(currentScene.id, { 
+                              textStyle: { ...currentScene.textStyle, color: e.target.value }
+                            })}
+                            className="w-full h-8 rounded border border-gray-600"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Background</label>
+                          <input
+                            type="color"
+                            value={currentScene.textStyle.backgroundColor}
+                            onChange={(e) => updateScene(currentScene.id, { 
+                              textStyle: { ...currentScene.textStyle, backgroundColor: e.target.value }
+                            })}
+                            className="w-full h-8 rounded border border-gray-600"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">
+                          Background Opacity: {currentScene.textStyle.backgroundOpacity}%
+                        </label>
+                        <Slider
+                          value={[currentScene.textStyle.backgroundOpacity]}
+                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
+                            textStyle: { ...currentScene.textStyle, backgroundOpacity: value }
+                          })}
+                          min={0}
+                          max={100}
+                          className="w-full"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            ) : (
+              <Card className="bg-gray-800 border-gray-700">
+                <CardContent className="flex items-center justify-center h-64">
+                  <div className="text-center text-gray-400">
+                    <Plus className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>Add a scene or select an existing one to start editing</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
