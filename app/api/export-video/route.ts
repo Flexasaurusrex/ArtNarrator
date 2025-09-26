@@ -64,4 +64,38 @@ export async function POST(request: NextRequest) {
     // Create scene list for display
     const readyScenes = transitions
       .filter((transition: SceneTransition) => transition.hasImage)
-      .map((transition: SceneTransition) => `• $
+      .map((transition: SceneTransition) => `Scene: ${transition.title} - ${transition.duration}s - ${transition.transition}`)
+      .join('\n');
+
+    const message = `Export Analysis Complete!\n\n` +
+      `Video Specs:\n` +
+      `Scenes: ${scenes.length} total, ${scenesWithImages.length} with images\n` +
+      `Duration: ${totalDuration.toFixed(1)} seconds\n` +
+      `Format: 1080x1920 vertical MP4\n` +
+      `Frame Rate: 30fps with transitions\n\n` +
+      `Ready Scenes:\n${readyScenes}\n\n` +
+      `Status: Ready for video generation`;
+
+    return NextResponse.json({
+      success: true,
+      message: message,
+      exportSummary,
+      readyForRemotion: true,
+      videoSpecs: {
+        width: 1080,
+        height: 1920,
+        fps: 30,
+        format: 'MP4',
+        codec: 'H.264'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Export error:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Export failed',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
+}
