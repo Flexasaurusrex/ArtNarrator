@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward, Clock } from 'lucide-react';
+import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward, Clock, Zap } from 'lucide-react';
 
 interface Scene {
   id: string;
@@ -28,6 +28,8 @@ interface Scene {
     textAlign: string;
   };
   transition: string;
+  transitionDuration: number; // New: control transition length
+  transitionIntensity: number; // New: control effect intensity
 }
 
 const TRANSITIONS = [
@@ -81,7 +83,9 @@ export default function SimpleVideoCreator() {
         fontWeight: 'bold',
         textAlign: 'center'
       },
-      transition: 'fade'
+      transition: 'fade',
+      transitionDuration: 1.0, // 1 second default
+      transitionIntensity: 100 // 100% intensity default
     };
     setScenes([...scenes, newScene]);
     setCurrentScene(newScene);
@@ -119,17 +123,18 @@ export default function SimpleVideoCreator() {
 
   const nextScene = () => {
     if (currentPreviewIndex < scenes.length - 1) {
-      // Start transition effect
+      const currentSceneData = scenes[currentPreviewIndex];
+      const transitionDuration = currentSceneData.transitionDuration * 1000; // Convert to ms
+      
       setIsTransitioning(true);
       setNextScenePreview(scenes[currentPreviewIndex + 1]);
       
-      // Complete transition after 800ms
       setTimeout(() => {
         setCurrentPreviewIndex(currentPreviewIndex + 1);
         setPreviewProgress(0);
         setIsTransitioning(false);
         setNextScenePreview(null);
-      }, 800);
+      }, transitionDuration);
     } else {
       stopPreview();
     }
@@ -137,6 +142,9 @@ export default function SimpleVideoCreator() {
 
   const prevScene = () => {
     if (currentPreviewIndex > 0) {
+      const currentSceneData = scenes[currentPreviewIndex - 1];
+      const transitionDuration = currentSceneData.transitionDuration * 1000;
+      
       setIsTransitioning(true);
       setNextScenePreview(scenes[currentPreviewIndex - 1]);
       
@@ -145,19 +153,23 @@ export default function SimpleVideoCreator() {
         setPreviewProgress(0);
         setIsTransitioning(false);
         setNextScenePreview(null);
-      }, 800);
+      }, transitionDuration);
     }
   };
 
-  // Auto-advance preview scenes with transition effects
+  // Auto-advance preview scenes with enhanced transition effects
   useEffect(() => {
     if (!isPlaying || scenes.length === 0 || isTransitioning) return;
 
-    const currentSceneDuration = scenes[currentPreviewIndex]?.duration || 5;
+    const currentSceneData = scenes[currentPreviewIndex];
+    if (!currentSceneData) return;
+
     const interval = setInterval(() => {
       setPreviewProgress(prev => {
-        // Start transition at 90% progress
-        if (prev >= 90 && prev < 100 && currentPreviewIndex < scenes.length - 1) {
+        const transitionStartPoint = 100 - (currentSceneData.transitionDuration / currentSceneData.duration * 100);
+        
+        // Start transition at calculated point
+        if (prev >= transitionStartPoint && prev < 100 && currentPreviewIndex < scenes.length - 1) {
           setIsTransitioning(true);
           setNextScenePreview(scenes[currentPreviewIndex + 1]);
         }
@@ -173,7 +185,7 @@ export default function SimpleVideoCreator() {
           }
           return 0;
         }
-        return prev + (100 / (currentSceneDuration * 10));
+        return prev + (100 / (currentSceneData.duration * 10));
       });
     }, 100);
 
@@ -202,7 +214,6 @@ export default function SimpleVideoCreator() {
       
       if (data.success) {
         if (data.videoUrl) {
-          // Download the actual video
           const a = document.createElement('a');
           a.href = data.videoUrl;
           a.download = 'video-essay.mp4';
@@ -220,28 +231,38 @@ export default function SimpleVideoCreator() {
     setIsExporting(false);
   };
 
-  const currentSceneForPreview = scenes[currentPreviewIndex];
+  // FIX: Show the right scene in preview
+  const sceneToShow = isPlaying ? scenes[currentPreviewIndex] : currentScene;
   
   const getTransitionClasses = (scene: Scene, isNext = false) => {
-    const baseClasses = "absolute inset-0 w-full h-full";
+    if (!scene) return "absolute inset-0 w-full h-full opacity-0";
+    
+    const baseClasses = "absolute inset-0 w-full h-full transition-all";
+    const intensity = scene.transitionIntensity / 100; // Convert percentage to decimal
+    const duration = scene.transitionDuration * 1000; // Convert to ms
     
     if (!isTransitioning) {
-      return `${baseClasses} transition-all duration-1000 ${isNext ? 'opacity-0' : 'opacity-100'}`;
+      return `${baseClasses} ${isNext ? 'opacity-0' : 'opacity-100'}`;
     }
+    
+    const transitionStyle = `duration-[${duration}ms]`;
     
     switch (scene.transition) {
       case 'fade':
-        return `${baseClasses} transition-opacity duration-800 ${isNext ? 'opacity-100' : 'opacity-0'}`;
+        return `${baseClasses} ${transitionStyle} transition-opacity ${isNext ? 'opacity-100' : `opacity-${Math.round((1-intensity)*100)}`}`;
       case 'slide-left':
-        return `${baseClasses} transition-transform duration-800 ${isNext ? 'translate-x-0' : '-translate-x-full'}`;
+        return `${baseClasses} ${transitionStyle} transition-transform ${isNext ? 'translate-x-0' : `-translate-x-${Math.round(intensity*100)}`}`;
       case 'slide-right':
-        return `${baseClasses} transition-transform duration-800 ${isNext ? 'translate-x-0' : 'translate-x-full'}`;
+        return `${baseClasses} ${transitionStyle} transition-transform ${isNext ? 'translate-x-0' : `translate-x-${Math.round(intensity*100)}`}`;
       case 'zoom-in':
-        return `${baseClasses} transition-transform duration-800 ${isNext ? 'scale-100' : 'scale-150 opacity-0'}`;
+        const zoomInScale = isNext ? 'scale-100' : `scale-${Math.round(100 + intensity*50)}`;
+        return `${baseClasses} ${transitionStyle} transition-transform ${zoomInScale} ${isNext ? 'opacity-100' : `opacity-${Math.round((1-intensity)*100)}`}`;
       case 'zoom-out':
-        return `${baseClasses} transition-transform duration-800 ${isNext ? 'scale-100' : 'scale-50 opacity-0'}`;
+        const zoomOutScale = isNext ? 'scale-100' : `scale-${Math.round(100 - intensity*50)}`;
+        return `${baseClasses} ${transitionStyle} transition-transform ${zoomOutScale} ${isNext ? 'opacity-100' : `opacity-${Math.round((1-intensity)*100)}`}`;
       case 'dissolve':
-        return `${baseClasses} transition-all duration-1000 ${isNext ? 'opacity-100 blur-0' : 'opacity-0 blur-sm'}`;
+        const blurAmount = Math.round(intensity * 4);
+        return `${baseClasses} ${transitionStyle} transition-all ${isNext ? 'opacity-100 blur-0' : `opacity-${Math.round((1-intensity)*100)} blur-[${blurAmount}px]`}`;
       default:
         return `${baseClasses} ${isNext ? '' : 'hidden'}`;
     }
@@ -290,7 +311,13 @@ export default function SimpleVideoCreator() {
                 {scenes.map((scene, index) => (
                   <div
                     key={scene.id}
-                    onClick={() => setCurrentScene(scene)}
+                    onClick={() => {
+                      setCurrentScene(scene);
+                      // If not playing, update preview to show this scene
+                      if (!isPlaying) {
+                        setCurrentPreviewIndex(index);
+                      }
+                    }}
                     className={`p-3 rounded cursor-pointer transition-colors relative ${
                       currentScene?.id === scene.id 
                         ? 'bg-blue-600' 
@@ -344,7 +371,7 @@ export default function SimpleVideoCreator() {
             {currentScene ? (
               <div className="space-y-6">
                 
-                {/* Enhanced Preview with Transitions */}
+                {/* Enhanced Preview */}
                 <Card className="bg-gray-800 border-gray-700">
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-gray-200">Preview</CardTitle>
@@ -376,39 +403,39 @@ export default function SimpleVideoCreator() {
                   </CardHeader>
                   <CardContent>
                     <div className="relative aspect-video bg-black rounded overflow-hidden">
-                      {/* Current Scene */}
-                      {currentSceneForPreview?.imageUrl && (
-                        <div className={getTransitionClasses(currentSceneForPreview, false)}>
+                      {/* Current/Selected Scene */}
+                      {sceneToShow?.imageUrl && (
+                        <div className={getTransitionClasses(sceneToShow, false)}>
                           <img 
-                            src={currentSceneForPreview.imageUrl}
+                            src={sceneToShow.imageUrl}
                             alt="Current Scene"
                             className="w-full h-full object-cover"
                           />
-                          {/* Text Overlay for Current Scene */}
+                          {/* Text Overlay */}
                           <div 
                             className={`absolute px-4 py-2 rounded max-w-[80%] transition-all duration-500 ${
                               isPlaying && !isTransitioning ? 'opacity-100' : 'opacity-80'
                             }`}
                             style={{
-                              left: `${currentSceneForPreview.textPosition.x}%`,
-                              top: `${currentSceneForPreview.textPosition.y}%`,
+                              left: `${sceneToShow.textPosition.x}%`,
+                              top: `${sceneToShow.textPosition.y}%`,
                               transform: 'translate(-50%, -50%)',
-                              fontSize: `${currentSceneForPreview.textStyle.fontSize}px`,
-                              fontFamily: currentSceneForPreview.textStyle.fontFamily,
-                              color: currentSceneForPreview.textStyle.color,
-                              backgroundColor: currentSceneForPreview.textStyle.backgroundColor + Math.round(currentSceneForPreview.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0'),
-                              fontWeight: currentSceneForPreview.textStyle.fontWeight,
-                              textAlign: currentSceneForPreview.textStyle.textAlign as any,
-                              backdropFilter: currentSceneForPreview.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none'
+                              fontSize: `${sceneToShow.textStyle.fontSize}px`,
+                              fontFamily: sceneToShow.textStyle.fontFamily,
+                              color: sceneToShow.textStyle.color,
+                              backgroundColor: sceneToShow.textStyle.backgroundColor + Math.round(sceneToShow.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0'),
+                              fontWeight: sceneToShow.textStyle.fontWeight,
+                              textAlign: sceneToShow.textStyle.textAlign as any,
+                              backdropFilter: sceneToShow.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none'
                             }}
                           >
-                            <div className="font-bold mb-1">{currentSceneForPreview.title}</div>
-                            <div className="text-sm leading-tight">{currentSceneForPreview.description}</div>
+                            <div className="font-bold mb-1">{sceneToShow.title}</div>
+                            <div className="text-sm leading-tight">{sceneToShow.description}</div>
                           </div>
                         </div>
                       )}
                       
-                      {/* Next Scene (for transitions) */}
+                      {/* Next Scene (during transitions) */}
                       {nextScenePreview?.imageUrl && isTransitioning && (
                         <div className={getTransitionClasses(nextScenePreview, true)}>
                           <img 
@@ -416,7 +443,6 @@ export default function SimpleVideoCreator() {
                             alt="Next Scene"
                             className="w-full h-full object-cover"
                           />
-                          {/* Text Overlay for Next Scene */}
                           <div 
                             className="absolute px-4 py-2 rounded max-w-[80%] opacity-100"
                             style={{
@@ -438,8 +464,8 @@ export default function SimpleVideoCreator() {
                         </div>
                       )}
                       
-                      {/* Fallback for no image */}
-                      {!currentSceneForPreview?.imageUrl && (
+                      {/* Fallback */}
+                      {!sceneToShow?.imageUrl && (
                         <div className="flex items-center justify-center h-full text-gray-400">
                           <div className="text-center">
                             <Image className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -449,12 +475,12 @@ export default function SimpleVideoCreator() {
                       )}
                     </div>
                     
-                    {/* Enhanced Preview Progress */}
+                    {/* Preview Progress */}
                     {isPlaying && (
                       <div className="mt-3">
                         <div className="flex items-center justify-between text-sm text-gray-400 mb-1">
                           <span>Scene {currentPreviewIndex + 1} of {scenes.length}</span>
-                          <span>{Math.ceil((100 - previewProgress) * (currentSceneForPreview?.duration || 5) / 100)}s remaining</span>
+                          <span>{Math.ceil((100 - previewProgress) * (sceneToShow?.duration || 5) / 100)}s remaining</span>
                         </div>
                         <div className="flex-1 bg-gray-700 rounded h-2 mb-2">
                           <div 
@@ -464,7 +490,7 @@ export default function SimpleVideoCreator() {
                         </div>
                         {isTransitioning && (
                           <div className="text-center text-yellow-400 text-sm">
-                            Transitioning ({currentSceneForPreview?.transition})...
+                            Transitioning ({sceneToShow?.transition}) - {sceneToShow?.transitionDuration}s @ {sceneToShow?.transitionIntensity}% intensity
                           </div>
                         )}
                       </div>
@@ -472,15 +498,15 @@ export default function SimpleVideoCreator() {
                   </CardContent>
                 </Card>
 
-                {/* Scene Settings - Same as before but with enhanced duration display */}
+                {/* Enhanced Scene Settings with Transition Controls */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
-                  {/* Image & Basic Info */}
+                  {/* Content Panel - Enhanced with transition controls */}
                   <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-gray-200 flex items-center">
                         <Image className="w-5 h-5 mr-2" />
-                        Content
+                        Content & Transitions
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -503,236 +529,3 @@ export default function SimpleVideoCreator() {
                           value={currentScene.title}
                           onChange={(e) => updateScene(currentScene.id, { title: e.target.value })}
                           placeholder="Scene title..."
-                          className="bg-gray-700 border-gray-600"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Description</label>
-                        <Textarea
-                          value={currentScene.description}
-                          onChange={(e) => updateScene(currentScene.id, { description: e.target.value })}
-                          placeholder="Scene narration text..."
-                          rows={3}
-                          className="bg-gray-700 border-gray-600"
-                        />
-                      </div>
-
-                      <div className="bg-gray-700/50 p-3 rounded">
-                        <label className="block text-sm font-medium mb-2 flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          Scene Duration: {currentScene.duration}s
-                        </label>
-                        <Slider
-                          value={[currentScene.duration]}
-                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { duration: value })}
-                          min={1}
-                          max={30}
-                          step={0.5}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>1s</span>
-                          <span>30s</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Transition Effect</label>
-                        <Select 
-                          value={currentScene.transition} 
-                          onValueChange={(value) => updateScene(currentScene.id, { transition: value })}
-                        >
-                          <SelectTrigger className="bg-gray-700 border-gray-600">
-                            <SelectValue placeholder="Select transition" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TRANSITIONS.map(transition => (
-                              <SelectItem key={transition.value} value={transition.value}>
-                                {transition.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Text Position - Same as before */}
-                  <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-gray-200 flex items-center">
-                        <Type className="w-5 h-5 mr-2" />
-                        Position
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Horizontal: {currentScene.textPosition.x}%
-                        </label>
-                        <Slider
-                          value={[currentScene.textPosition.x]}
-                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
-                            textPosition: { ...currentScene.textPosition, x: value }
-                          })}
-                          min={10}
-                          max={90}
-                          className="w-full"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Vertical: {currentScene.textPosition.y}%
-                        </label>
-                        <Slider
-                          value={[currentScene.textPosition.y]}
-                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
-                            textPosition: { ...currentScene.textPosition, y: value }
-                          })}
-                          min={10}
-                          max={90}
-                          className="w-full"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => updateScene(currentScene.id, { 
-                            textPosition: { x: 50, y: 20 } 
-                          })}
-                        >
-                          Top
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => updateScene(currentScene.id, { 
-                            textPosition: { x: 50, y: 50 } 
-                          })}
-                        >
-                          Center
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => updateScene(currentScene.id, { 
-                            textPosition: { x: 50, y: 80 } 
-                          })}
-                        >
-                          Bottom
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Text Style - Same as before */}
-                  <Card className="bg-gray-800 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-gray-200 flex items-center">
-                        <Palette className="w-5 h-5 mr-2" />
-                        Text Style
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Font</label>
-                          <Select 
-                            value={currentScene.textStyle.fontFamily} 
-                            onValueChange={(value) => updateScene(currentScene.id, { 
-                              textStyle: { ...currentScene.textStyle, fontFamily: value }
-                            })}
-                          >
-                            <SelectTrigger className="bg-gray-700 border-gray-600">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {FONTS.map(font => (
-                                <SelectItem key={font.value} value={font.value}>
-                                  {font.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-2">
-                            Size: {currentScene.textStyle.fontSize}px
-                          </label>
-                          <Slider
-                            value={[currentScene.textStyle.fontSize]}
-                            onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
-                              textStyle: { ...currentScene.textStyle, fontSize: value }
-                            })}
-                            min={12}
-                            max={48}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Text Color</label>
-                          <input
-                            type="color"
-                            value={currentScene.textStyle.color}
-                            onChange={(e) => updateScene(currentScene.id, { 
-                              textStyle: { ...currentScene.textStyle, color: e.target.value }
-                            })}
-                            className="w-full h-8 rounded border border-gray-600"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium mb-2">Background</label>
-                          <input
-                            type="color"
-                            value={currentScene.textStyle.backgroundColor}
-                            onChange={(e) => updateScene(currentScene.id, { 
-                              textStyle: { ...currentScene.textStyle, backgroundColor: e.target.value }
-                            })}
-                            className="w-full h-8 rounded border border-gray-600"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Background Opacity: {currentScene.textStyle.backgroundOpacity}%
-                        </label>
-                        <Slider
-                          value={[currentScene.textStyle.backgroundOpacity]}
-                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
-                            textStyle: { ...currentScene.textStyle, backgroundOpacity: value }
-                          })}
-                          min={0}
-                          max={100}
-                          className="w-full"
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            ) : (
-              <Card className="bg-gray-800 border-gray-700">
-                <CardContent className="flex items-center justify-center h-64">
-                  <div className="text-center text-gray-400">
-                    <Plus className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p>Add a scene or select an existing one to start editing</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
