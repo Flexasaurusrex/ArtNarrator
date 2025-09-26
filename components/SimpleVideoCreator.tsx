@@ -1,11 +1,12 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
-import { Plus, Download, Play, Image, Type } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward } from 'lucide-react';
 
 interface Scene {
   id: string;
@@ -19,21 +20,42 @@ interface Scene {
   };
   textStyle: {
     fontSize: number;
-    fontWeight: string;
-    textColor: string;
+    fontFamily: string;
+    color: string;
     backgroundColor: string;
     backgroundOpacity: number;
+    fontWeight: string;
+    textAlign: string;
   };
   transition: string;
 }
+
+const TRANSITIONS = [
+  { value: 'fade', label: 'Fade' },
+  { value: 'slide', label: 'Slide' },
+  { value: 'zoom', label: 'Zoom In' },
+  { value: 'dissolve', label: 'Dissolve' },
+  { value: 'none', label: 'Cut' }
+];
+
+const FONTS = [
+  { value: 'Inter', label: 'Inter' },
+  { value: 'Arial', label: 'Arial' },
+  { value: 'Georgia', label: 'Georgia' },
+  { value: 'Times New Roman', label: 'Times' },
+  { value: 'Helvetica', label: 'Helvetica' }
+];
 
 export default function SimpleVideoCreator() {
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [currentScene, setCurrentScene] = useState<Scene | null>(null);
   const [backgroundMusic, setBackgroundMusic] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Preview state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentPreviewScene, setCurrentPreviewScene] = useState(0);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+  const [previewProgress, setPreviewProgress] = useState(0);
 
   const addScene = () => {
     const newScene: Scene = {
@@ -42,13 +64,15 @@ export default function SimpleVideoCreator() {
       title: '',
       description: '',
       duration: 5,
-      textPosition: { x: 50, y: 80 }, // Bottom center by default
+      textPosition: { x: 50, y: 80 },
       textStyle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        textColor: '#ffffff',
+        fontSize: 24,
+        fontFamily: 'Inter',
+        color: '#ffffff',
         backgroundColor: '#000000',
         backgroundOpacity: 50,
+        fontWeight: 'bold',
+        textAlign: 'center'
       },
       transition: 'fade'
     };
@@ -70,7 +94,59 @@ export default function SimpleVideoCreator() {
     updateScene(sceneId, { imageUrl });
   };
 
+  // Preview functionality
+  const startPreview = () => {
+    if (scenes.length === 0) return;
+    setIsPlaying(true);
+    setCurrentPreviewIndex(0);
+    setPreviewProgress(0);
+  };
+
+  const stopPreview = () => {
+    setIsPlaying(false);
+    setPreviewProgress(0);
+  };
+
+  const nextScene = () => {
+    if (currentPreviewIndex < scenes.length - 1) {
+      setCurrentPreviewIndex(currentPreviewIndex + 1);
+      setPreviewProgress(0);
+    } else {
+      stopPreview();
+    }
+  };
+
+  const prevScene = () => {
+    if (currentPreviewIndex > 0) {
+      setCurrentPreviewIndex(currentPreviewIndex - 1);
+      setPreviewProgress(0);
+    }
+  };
+
+  // Auto-advance preview scenes
+  useEffect(() => {
+    if (!isPlaying || scenes.length === 0) return;
+
+    const currentSceneDuration = scenes[currentPreviewIndex]?.duration || 5;
+    const interval = setInterval(() => {
+      setPreviewProgress(prev => {
+        if (prev >= 100) {
+          nextScene();
+          return 0;
+        }
+        return prev + (100 / (currentSceneDuration * 10)); // Update 10 times per second
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, currentPreviewIndex, scenes]);
+
   const exportVideo = async () => {
+    if (scenes.length === 0) {
+      alert('Add at least one scene before exporting');
+      return;
+    }
+
     setIsExporting(true);
     try {
       const response = await fetch('/api/export-video', {
@@ -85,10 +161,10 @@ export default function SimpleVideoCreator() {
       const data = await response.json();
       
       if (data.success) {
-        alert(`Export successful! ${data.message}`);
-        // TODO: Download actual video file when Remotion is integrated
+        alert(data.message || 'Export completed successfully!');
+        // When real export is implemented, this will download the video
       } else {
-        alert('Export failed: ' + data.error);
+        alert('Export failed: ' + (data.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Export failed:', error);
@@ -97,35 +173,7 @@ export default function SimpleVideoCreator() {
     setIsExporting(false);
   };
 
-  const playPreview = () => {
-    if (scenes.length === 0) return;
-    
-    setIsPlaying(true);
-    setCurrentPreviewScene(0);
-    
-    let sceneIndex = 0;
-    const playNextScene = () => {
-      if (sceneIndex < scenes.length) {
-        setCurrentPreviewScene(sceneIndex);
-        const sceneDuration = scenes[sceneIndex].duration * 1000; // Convert to ms
-        
-        setTimeout(() => {
-          sceneIndex++;
-          playNextScene();
-        }, sceneDuration);
-      } else {
-        setIsPlaying(false);
-        setCurrentPreviewScene(0);
-      }
-    };
-    
-    playNextScene();
-  };
-
-  const stopPreview = () => {
-    setIsPlaying(false);
-    setCurrentPreviewScene(0);
-  };
+  const previewScene = scenes[currentPreviewIndex] || currentScene || scenes[0];
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
@@ -135,14 +183,6 @@ export default function SimpleVideoCreator() {
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">Video Essay Creator</h1>
           <div className="flex gap-3">
-            <Button 
-              onClick={isPlaying ? stopPreview : playPreview}
-              disabled={scenes.length === 0}
-              variant="outline"
-            >
-              {isPlaying ? 'Stop' : <Play className="w-4 h-4 mr-2" />}
-              {isPlaying ? 'Stop Preview' : 'Play Preview'}
-            </Button>
             <Button onClick={addScene} className="bg-blue-600 hover:bg-blue-700">
               <Plus className="w-4 h-4 mr-2" />
               Add Scene
@@ -171,12 +211,20 @@ export default function SimpleVideoCreator() {
                   <div
                     key={scene.id}
                     onClick={() => setCurrentScene(scene)}
-                    className={`p-3 rounded cursor-pointer transition-colors ${
+                    className={`p-3 rounded cursor-pointer transition-colors relative ${
                       currentScene?.id === scene.id 
                         ? 'bg-blue-600' 
+                        : currentPreviewIndex === index && isPlaying
+                        ? 'bg-green-600'
                         : 'bg-gray-700 hover:bg-gray-600'
                     }`}
                   >
+                    {currentPreviewIndex === index && isPlaying && (
+                      <div 
+                        className="absolute bottom-0 left-0 h-1 bg-green-300 transition-all duration-100"
+                        style={{ width: `${previewProgress}%` }}
+                      />
+                    )}
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-8 bg-gray-600 rounded flex items-center justify-center">
                         {scene.imageUrl ? (
@@ -194,7 +242,7 @@ export default function SimpleVideoCreator() {
                           {scene.title || `Scene ${index + 1}`}
                         </div>
                         <div className="text-xs text-gray-400">
-                          {scene.duration}s
+                          {scene.duration}s • {scene.transition}
                         </div>
                       </div>
                     </div>
@@ -218,72 +266,98 @@ export default function SimpleVideoCreator() {
                 
                 {/* Preview */}
                 <Card className="bg-gray-800 border-gray-700">
-                  <CardHeader>
-                    <CardTitle className="text-gray-200 flex items-center justify-between">
-                      Preview
-                      {isPlaying && (
-                        <span className="text-sm font-normal text-blue-400">
-                          Playing Scene {currentPreviewScene + 1} of {scenes.length}
-                        </span>
-                      )}
-                    </CardTitle>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-gray-200">Preview</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={prevScene}
+                        disabled={currentPreviewIndex === 0 && !isPlaying}
+                      >
+                        <SkipBack className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        onClick={isPlaying ? stopPreview : startPreview}
+                        disabled={scenes.length === 0}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={nextScene}
+                        disabled={currentPreviewIndex === scenes.length - 1 && !isPlaying}
+                      >
+                        <SkipForward className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="relative aspect-video bg-black rounded overflow-hidden">
-                      {(() => {
-                        const previewScene = isPlaying && scenes[currentPreviewScene] 
-                          ? scenes[currentPreviewScene] 
-                          : currentScene;
-                        
-                        return previewScene?.imageUrl ? (
-                          <>
-                            <img 
-                              src={previewScene.imageUrl}
-                              alt="Scene"
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Text Overlay */}
-                            <div 
-                              className="absolute text-center px-4 py-2 backdrop-blur-sm rounded"
-                              style={{
-                                left: `${previewScene.textPosition.x}%`,
-                                top: `${previewScene.textPosition.y}%`,
-                                transform: 'translate(-50%, -50%)',
-                                maxWidth: '80%',
-                                color: previewScene.textStyle?.textColor || '#ffffff',
-                                backgroundColor: `${previewScene.textStyle?.backgroundColor || '#000000'}${Math.round((previewScene.textStyle?.backgroundOpacity || 50) * 255 / 100).toString(16).padStart(2, '0')}`,
-                                fontSize: `${previewScene.textStyle?.fontSize || 18}px`,
-                                fontWeight: previewScene.textStyle?.fontWeight || 'bold'
-                              }}
-                            >
-                              <div className="mb-1">{previewScene.title}</div>
-                              <div style={{ fontSize: `${(previewScene.textStyle?.fontSize || 18) * 0.8}px` }}>
-                                {previewScene.description}
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex items-center justify-center h-full text-gray-400">
-                            <div className="text-center">
-                              <Image className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                              <p>Upload an image to see preview</p>
-                            </div>
+                      {previewScene?.imageUrl ? (
+                        <>
+                          <img 
+                            src={previewScene.imageUrl}
+                            alt="Scene"
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Text Overlay */}
+                          <div 
+                            className="absolute px-4 py-2 rounded max-w-[80%]"
+                            style={{
+                              left: `${previewScene.textPosition.x}%`,
+                              top: `${previewScene.textPosition.y}%`,
+                              transform: 'translate(-50%, -50%)',
+                              fontSize: `${previewScene.textStyle.fontSize}px`,
+                              fontFamily: previewScene.textStyle.fontFamily,
+                              color: previewScene.textStyle.color,
+                              backgroundColor: previewScene.textStyle.backgroundColor + Math.round(previewScene.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0'),
+                              fontWeight: previewScene.textStyle.fontWeight,
+                              textAlign: previewScene.textStyle.textAlign as any,
+                              backdropFilter: previewScene.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none'
+                            }}
+                          >
+                            <div className="font-bold mb-1">{previewScene.title}</div>
+                            <div className="text-sm leading-tight">{previewScene.description}</div>
                           </div>
-                        );
-                      })()}
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-gray-400">
+                          <div className="text-center">
+                            <Image className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                            <p>Upload an image to see preview</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                    
+                    {/* Preview Progress */}
+                    {isPlaying && (
+                      <div className="mt-3 flex items-center gap-2 text-sm text-gray-400">
+                        <span>Scene {currentPreviewIndex + 1} of {scenes.length}</span>
+                        <div className="flex-1 bg-gray-700 rounded h-2">
+                          <div 
+                            className="bg-green-500 h-2 rounded transition-all duration-100"
+                            style={{ width: `${previewProgress}%` }}
+                          />
+                        </div>
+                        <span>{Math.ceil((100 - previewProgress) * (previewScene?.duration || 5) / 100)}s</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
                 {/* Scene Settings */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
                   {/* Image & Basic Info */}
                   <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-gray-200 flex items-center">
                         <Image className="w-5 h-5 mr-2" />
-                        Image & Content
+                        Content
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -334,19 +408,37 @@ export default function SimpleVideoCreator() {
                           className="w-full"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Transition</label>
+                        <Select 
+                          value={currentScene.transition} 
+                          onValueChange={(value) => updateScene(currentScene.id, { transition: value })}
+                        >
+                          <SelectTrigger className="bg-gray-700 border-gray-600">
+                            <SelectValue placeholder="Select transition" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TRANSITIONS.map(transition => (
+                              <SelectItem key={transition.value} value={transition.value}>
+                                {transition.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </CardContent>
                   </Card>
 
-                  {/* Text Positioning & Styling */}
+                  {/* Text Position */}
                   <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-gray-200 flex items-center">
                         <Type className="w-5 h-5 mr-2" />
-                        Text & Effects
+                        Position
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {/* Position Controls */}
                       <div>
                         <label className="block text-sm font-medium mb-2">
                           Horizontal: {currentScene.textPosition.x}%
@@ -377,7 +469,6 @@ export default function SimpleVideoCreator() {
                         />
                       </div>
 
-                      {/* Quick Position Buttons */}
                       <div className="grid grid-cols-3 gap-2">
                         <Button 
                           variant="outline" 
@@ -407,56 +498,90 @@ export default function SimpleVideoCreator() {
                           Bottom
                         </Button>
                       </div>
+                    </CardContent>
+                  </Card>
 
-                      <hr className="border-gray-600" />
+                  {/* Text Style */}
+                  <Card className="bg-gray-800 border-gray-700">
+                    <CardHeader>
+                      <CardTitle className="text-gray-200 flex items-center">
+                        <Palette className="w-5 h-5 mr-2" />
+                        Text Style
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium mb-2">Font</label>
+                          <Select 
+                            value={currentScene.textStyle.fontFamily} 
+                            onValueChange={(value) => updateScene(currentScene.id, { 
+                              textStyle: { ...currentScene.textStyle, fontFamily: value }
+                            })}
+                          >
+                            <SelectTrigger className="bg-gray-700 border-gray-600">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {FONTS.map(font => (
+                                <SelectItem key={font.value} value={font.value}>
+                                  {font.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                      {/* Text Styling */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">
-                          Font Size: {currentScene.textStyle?.fontSize || 18}px
-                        </label>
-                        <Slider
-                          value={[currentScene.textStyle?.fontSize || 18]}
-                          onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
-                            textStyle: { ...currentScene.textStyle, fontSize: value }
-                          })}
-                          min={12}
-                          max={48}
-                          className="w-full"
-                        />
+                        <div>
+                          <label className="block text-sm font-medium mb-2">
+                            Size: {currentScene.textStyle.fontSize}px
+                          </label>
+                          <Slider
+                            value={[currentScene.textStyle.fontSize]}
+                            onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
+                              textStyle: { ...currentScene.textStyle, fontSize: value }
+                            })}
+                            min={12}
+                            max={48}
+                            className="w-full"
+                          />
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium mb-2">Text Color</label>
-                          <input
-                            type="color"
-                            value={currentScene.textStyle?.textColor || '#ffffff'}
-                            onChange={(e) => updateScene(currentScene.id, {
-                              textStyle: { ...currentScene.textStyle, textColor: e.target.value }
-                            })}
-                            className="w-full h-10 rounded border border-gray-600 bg-gray-700"
-                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="color"
+                              value={currentScene.textStyle.color}
+                              onChange={(e) => updateScene(currentScene.id, { 
+                                textStyle: { ...currentScene.textStyle, color: e.target.value }
+                              })}
+                              className="w-full h-8 rounded border border-gray-600"
+                            />
+                          </div>
                         </div>
+
                         <div>
                           <label className="block text-sm font-medium mb-2">Background</label>
                           <input
                             type="color"
-                            value={currentScene.textStyle?.backgroundColor || '#000000'}
-                            onChange={(e) => updateScene(currentScene.id, {
+                            value={currentScene.textStyle.backgroundColor}
+                            onChange={(e) => updateScene(currentScene.id, { 
                               textStyle: { ...currentScene.textStyle, backgroundColor: e.target.value }
                             })}
-                            className="w-full h-10 rounded border border-gray-600 bg-gray-700"
+                            className="w-full h-8 rounded border border-gray-600"
                           />
                         </div>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium mb-2">
-                          Background Opacity: {currentScene.textStyle?.backgroundOpacity || 50}%
+                          Background Opacity: {currentScene.textStyle.backgroundOpacity}%
                         </label>
                         <Slider
-                          value={[currentScene.textStyle?.backgroundOpacity || 50]}
+                          value={[currentScene.textStyle.backgroundOpacity]}
                           onValueChange={([value]: number[]) => updateScene(currentScene.id, { 
                             textStyle: { ...currentScene.textStyle, backgroundOpacity: value }
                           })}
@@ -464,43 +589,6 @@ export default function SimpleVideoCreator() {
                           max={100}
                           className="w-full"
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Font Weight</label>
-                        <select
-                          value={currentScene.textStyle?.fontWeight || 'bold'}
-                          onChange={(e) => updateScene(currentScene.id, {
-                            textStyle: { ...currentScene.textStyle, fontWeight: e.target.value }
-                          })}
-                          className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="bold">Bold</option>
-                          <option value="600">Semi Bold</option>
-                          <option value="900">Extra Bold</option>
-                        </select>
-                      </div>
-
-                      <hr className="border-gray-600" />
-
-                      {/* Transition Effects */}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Scene Transition</label>
-                        <select
-                          value={currentScene.transition || 'fade'}
-                          onChange={(e) => updateScene(currentScene.id, { transition: e.target.value })}
-                          className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
-                        >
-                          <option value="fade">Fade</option>
-                          <option value="slide_left">Slide Left</option>
-                          <option value="slide_right">Slide Right</option>
-                          <option value="slide_up">Slide Up</option>
-                          <option value="slide_down">Slide Down</option>
-                          <option value="zoom_in">Zoom In</option>
-                          <option value="zoom_out">Zoom Out</option>
-                          <option value="cut">Cut (No Transition)</option>
-                        </select>
                       </div>
                     </CardContent>
                   </Card>
