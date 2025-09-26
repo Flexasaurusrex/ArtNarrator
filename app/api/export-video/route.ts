@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 300; // 5 minutes timeout
 
+interface SceneTransition {
+  scene: number;
+  title: string;
+  duration: number;
+  transition: string;
+  transitionDuration: number;
+  transitionIntensity: number;
+  hasImage: boolean;
+  hasText: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { scenes, backgroundMusic, totalDuration } = await request.json();
@@ -27,48 +38,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // For now, return success with detailed export info
-    // Later we'll implement actual video rendering
+    // Create transitions array with proper typing
+    const transitions: SceneTransition[] = scenes.map((scene: any, index: number) => ({
+      scene: index + 1,
+      title: scene.title || `Scene ${index + 1}`,
+      duration: scene.duration,
+      transition: scene.transition,
+      transitionDuration: scene.transitionDuration,
+      transitionIntensity: scene.transitionIntensity,
+      hasImage: !!scene.imageUrl,
+      hasText: !!(scene.title || scene.description)
+    }));
+
     const exportSummary = {
       totalScenes: scenes.length,
       scenesWithImages: scenesWithImages.length,
       totalDuration: totalDuration,
       exportFormat: 'MP4 (1080x1920)',
       fps: 30,
-      transitions: scenes.map((scene: any, index: number) => ({
-        scene: index + 1,
-        title: scene.title || `Scene ${index + 1}`,
-        duration: scene.duration,
-        transition: scene.transition,
-        transitionDuration: scene.transitionDuration,
-        transitionIntensity: scene.transitionIntensity,
-        hasImage: !!scene.imageUrl,
-        hasText: !!(scene.title || scene.description)
-      }))
+      transitions: transitions
     };
 
     console.log('Export summary prepared:', exportSummary);
 
-    return NextResponse.json({
-      success: true,
-      message: `✅ Export Analysis Complete!\n\n📊 Video Specs:\n• ${scenes.length} scenes (${scenesWithImages.length} with images)\n• ${totalDuration.toFixed(1)}s total duration\n• 1080x1920 vertical format\n• 30fps with transitions\n\n🎬 Scenes Ready:\n${exportSummary.transitions.filter(t => t.hasImage).map(t => `• ${t.title} (${t.duration}s, ${t.transition})`).join('\n')}\n\n⚡ Status: Ready for video generation\n(Full MP4 export coming soon!)`,
-      exportSummary,
-      readyForRemotion: true,
-      videoSpecs: {
-        width: 1080,
-        height: 1920,
-        fps: 30,
-        format: 'MP4',
-        codec: 'H.264'
-      }
-    });
-    
-  } catch (error) {
-    console.error('Export error:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Export failed',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
-}
+    // Create scene list for display
+    const readyScenes = transitions
+      .filter((transition: SceneTransition) => transition.hasImage)
+      .map((transition: SceneTransition) => `• $
