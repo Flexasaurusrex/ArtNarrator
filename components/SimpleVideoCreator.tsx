@@ -352,7 +352,7 @@ export default function SimpleVideoCreator() {
         const sceneDurationFrames = Math.ceil(scene.duration * fps);
 
         // Load the image
-        const img = new Image();
+        const img = document.createElement('img');
         img.crossOrigin = 'anonymous';
         
         await new Promise((resolve, reject) => {
