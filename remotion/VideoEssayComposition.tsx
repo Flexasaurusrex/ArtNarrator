@@ -52,7 +52,6 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
   if (!currentScene) return null;
   
   const sceneDurationInFrames = currentScene.duration * fps;
-  const sceneProgress = (frame - sceneStartFrame) / sceneDurationInFrames;
   const transitionDurationInFrames = fps * 0.8; // 0.8 second transitions
   
   // Check if we're in transition phase (last 0.8 seconds of scene)
@@ -106,7 +105,7 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
           opacity: isNext ? progress : 1 - progress,
           filter: `blur(${isNext ? (1 - progress) * 4 : progress * 4}px)`,
         };
-      default: // 'none' or cut
+      default:
         return {
           ...baseStyle,
           opacity: isNext && progress > 0.5 ? 1 : (!isNext ? 1 : 0),
@@ -204,3 +203,15 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
               lineHeight: 1.4,
             }}
           >
+            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+              {nextScene.title}
+            </div>
+            <div style={{ fontSize: `${nextScene.textStyle.fontSize * 0.75}px` }}>
+              {nextScene.description}
+            </div>
+          </div>
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};
