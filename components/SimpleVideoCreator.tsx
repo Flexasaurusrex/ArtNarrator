@@ -547,7 +547,7 @@ export default function SimpleVideoCreator() {
                     <label className="block text-sm font-medium mb-2">Duration: {currentScene.duration}s</label>
                     <Slider
                       value={[currentScene.duration]}
-                      onValueChange={([value]) => updateScene(currentScene.id, { duration: value })}
+                      onValueChange={(value: number[]) => updateScene(currentScene.id, { duration: value[0] })}
                       min={1}
                       max={10}
                       step={0.5}
@@ -563,8 +563,8 @@ export default function SimpleVideoCreator() {
                       <label className="block text-sm font-medium mb-2">Size: {currentScene.textStyle.fontSize}px</label>
                       <Slider
                         value={[currentScene.textStyle.fontSize]}
-                        onValueChange={([value]) => updateScene(currentScene.id, { 
-                          textStyle: { ...currentScene.textStyle, fontSize: value }
+                        onValueChange={(value: number[]) => updateScene(currentScene.id, { 
+                          textStyle: { ...currentScene.textStyle, fontSize: value[0] }
                         })}
                         min={20}
                         max={120}
@@ -589,10 +589,10 @@ export default function SimpleVideoCreator() {
                       <label className="block text-sm font-medium mb-2">Horizontal Position: {currentScene.textStyle.position.x}%</label>
                       <Slider
                         value={[currentScene.textStyle.position.x]}
-                        onValueChange={([value]) => updateScene(currentScene.id, {
+                        onValueChange={(value: number[]) => updateScene(currentScene.id, {
                           textStyle: { 
                             ...currentScene.textStyle, 
-                            position: { ...currentScene.textStyle.position, x: value }
+                            position: { ...currentScene.textStyle.position, x: value[0] }
                           }
                         })}
                         min={0}
@@ -606,10 +606,10 @@ export default function SimpleVideoCreator() {
                       <label className="block text-sm font-medium mb-2">Vertical Position: {currentScene.textStyle.position.y}%</label>
                       <Slider
                         value={[currentScene.textStyle.position.y]}
-                        onValueChange={([value]) => updateScene(currentScene.id, {
+                        onValueChange={(value: number[]) => updateScene(currentScene.id, {
                           textStyle: { 
                             ...currentScene.textStyle, 
-                            position: { ...currentScene.textStyle.position, y: value }
+                            position: { ...currentScene.textStyle.position, y: value[0] }
                           }
                         })}
                         min={0}
@@ -623,8 +623,8 @@ export default function SimpleVideoCreator() {
                       <label className="block text-sm font-medium mb-2">Opacity: {currentScene.textStyle.opacity}%</label>
                       <Slider
                         value={[currentScene.textStyle.opacity]}
-                        onValueChange={([value]) => updateScene(currentScene.id, {
-                          textStyle: { ...currentScene.textStyle, opacity: value }
+                        onValueChange={(value: number[]) => updateScene(currentScene.id, {
+                          textStyle: { ...currentScene.textStyle, opacity: value[0] }
                         })}
                         min={0}
                         max={100}
@@ -663,7 +663,7 @@ export default function SimpleVideoCreator() {
                       <label className="block text-sm font-medium mb-2">Duration: {currentScene.transitionDuration}s</label>
                       <Slider
                         value={[currentScene.transitionDuration]}
-                        onValueChange={([value]) => updateScene(currentScene.id, { transitionDuration: value })}
+                        onValueChange={(value: number[]) => updateScene(currentScene.id, { transitionDuration: value[0] })}
                         min={0.1}
                         max={2.0}
                         step={0.1}
@@ -675,7 +675,7 @@ export default function SimpleVideoCreator() {
                       <label className="block text-sm font-medium mb-2">Intensity: {currentScene.transitionIntensity}%</label>
                       <Slider
                         value={[currentScene.transitionIntensity]}
-                        onValueChange={([value]) => updateScene(currentScene.id, { transitionIntensity: value })}
+                        onValueChange={(value: number[]) => updateScene(currentScene.id, { transitionIntensity: value[0] })}
                         min={0}
                         max={100}
                         step={5}
