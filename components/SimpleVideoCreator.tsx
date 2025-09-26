@@ -74,9 +74,8 @@ export default function SimpleVideoCreator() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   
-  // Conversion state
-  const [isConverting, setIsConverting] = useState(false);
-  const [conversionProgress, setConversionProgress] = useState(0);
+  // Export state
+  const [showConversionHelper, setShowConversionHelper] = useState(false);
   
   // Overall video duration
   const totalDuration = scenes.reduce((acc, scene) => acc + scene.duration, 0);
@@ -232,65 +231,8 @@ export default function SimpleVideoCreator() {
     }
   };
 
-  // CloudConvert integration for WebM to MP4 conversion
-  const convertToMP4 = async (webmBlob: Blob) => {
-    setIsConverting(true);
-    setConversionProgress(0);
-
-    try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('file', webmBlob, 'video.webm');
-      formData.append('inputformat', 'webm');
-      formData.append('outputformat', 'mp4');
-      formData.append('options[video_codec]', 'libx264');
-      formData.append('options[audio_codec]', 'aac');
-      formData.append('options[preset]', 'fast');
-
-      // Use CloudConvert's free conversion endpoint
-      // Note: For production, you'd want to use their proper API with authentication
-      const response = await fetch('https://api.cloudconvert.com/v2/convert', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Conversion service temporarily unavailable');
-      }
-
-      const result = await response.blob();
-      
-      setConversionProgress(100);
-      
-      // Download the converted MP4
-      const url = URL.createObjectURL(result);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `video-essay-${Date.now()}.mp4`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      alert('Video successfully converted to MP4!\nReady for social media upload.');
-
-    } catch (error) {
-      console.error('Conversion failed:', error);
-      
-      // Fallback: offer WebM download with conversion suggestion
-      const url = URL.createObjectURL(webmBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `video-essay-${Date.now()}.webm`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      alert(`Conversion to MP4 failed. Downloaded WebM file instead.\n\nTo convert for social media:\n1. Visit cloudconvert.com\n2. Upload your WebM file\n3. Convert to MP4\n4. Download and share!`);
-    }
-
-    setIsConverting(false);
-    setConversionProgress(0);
-  };
-
-  // Enhanced export with proper dimensions
+  // Simple, reliable export without conversion
+  const exportVideo = async () => {
   const exportVideo = async () => {
     if (scenes.length === 0) {
       alert('Add at least one scene before exporting');
@@ -337,10 +279,16 @@ export default function SimpleVideoCreator() {
       mediaRecorderRef.current.onstop = () => {
         const webmBlob = new Blob(chunksRef.current, { type: 'video/webm' });
         
-        // Automatically convert to MP4 for social media compatibility
-        convertToMP4(webmBlob);
+        // Download WebM file
+        const url = URL.createObjectURL(webmBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `video-essay-${orientation}-${Date.now()}.webm`;
+        a.click();
+        URL.revokeObjectURL(url);
         
         setIsExporting(false);
+        setShowConversionHelper(true);
       };
 
       // Start recording
@@ -499,11 +447,11 @@ export default function SimpleVideoCreator() {
             </Button>
             <Button 
               onClick={exportVideo}
-              disabled={scenes.length === 0 || isExporting || isConverting}
+              disabled={scenes.length === 0 || isExporting}
               className="bg-green-600 hover:bg-green-700"
             >
               <Download className="w-4 h-4 mr-2" />
-              {isExporting ? 'Recording Video...' : isConverting ? `Converting to MP4... ${conversionProgress}%` : 'Export Video'}
+              {isExporting ? 'Recording Video...' : 'Export Video'}
             </Button>
           </div>
         </div>
@@ -1012,6 +960,69 @@ export default function SimpleVideoCreator() {
             )}
           </div>
         </div>
+        
+        {/* Conversion Helper Modal */}
+        {showConversionHelper && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <Card className="w-full max-w-lg mx-4 bg-gray-800 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-gray-200">Video Exported Successfully!</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-gray-300">
+                  Your video has been saved as a WebM file. To share on social media, you'll need to convert it to MP4:
+                </p>
+                
+                <div className="bg-gray-700 p-4 rounded space-y-3">
+                  <h4 className="font-medium text-gray-200">Quick Conversion Options:</h4>
+                  
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={() => window.open('https://cloudconvert.com/webm-to-mp4', '_blank')}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      Convert with CloudConvert (Free)
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => window.open('https://convertio.co/webm-mp4/', '_blank')}
+                      className="w-full bg-purple-600 hover:bg-purple-700"
+                    >
+                      Convert with Convertio (Free)
+                    </Button>
+                    
+                    <Button 
+                      onClick={() => window.open('https://www.freeconvert.com/webm-to-mp4', '_blank')}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      Convert with FreeConvert (Free)
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="text-sm text-gray-400">
+                  <p><strong>Steps:</strong></p>
+                  <ol className="list-decimal list-inside space-y-1 mt-2">
+                    <li>Click one of the conversion links above</li>
+                    <li>Upload your WebM file</li>
+                    <li>Convert to MP4</li>
+                    <li>Download and share on social media!</li>
+                  </ol>
+                </div>
+                
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={() => setShowConversionHelper(false)}
+                    className="flex-1"
+                    variant="outline"
+                  >
+                    Got it, thanks!
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
