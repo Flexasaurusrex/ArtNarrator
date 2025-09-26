@@ -14,7 +14,10 @@
     "postinstall": "prisma generate",
     "deploy:db": "prisma migrate deploy",
     "test": "jest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "remotion:preview": "remotion preview",
+    "remotion:render": "remotion render",
+    "remotion:upgrade": "remotion upgrade"
   },
   "dependencies": {
     "next": "14.2.0",
