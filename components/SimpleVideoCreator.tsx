@@ -91,9 +91,12 @@ export default function SimpleVideoCreator() {
   };
 
   const updateScene = (sceneId: string, updates: Partial<Scene>) => {
-    setScenes(scenes.map(scene => 
+    const updatedScenes = scenes.map(scene => 
       scene.id === sceneId ? { ...scene, ...updates } : scene
-    ));
+    );
+    setScenes(updatedScenes);
+    
+    // CRITICAL FIX: Always update currentScene if it matches the updated scene
     if (currentScene?.id === sceneId) {
       setCurrentScene({ ...currentScene, ...updates });
     }
@@ -224,8 +227,8 @@ export default function SimpleVideoCreator() {
     setIsExporting(false);
   };
 
-  // Show the right scene in preview
-  const sceneToShow = isPlaying ? scenes[currentPreviewIndex] : currentScene;
+  // FIXED: Priority logic for showing scenes - always prioritize currently edited scene
+  const sceneToShow = currentScene || (isPlaying ? scenes[currentPreviewIndex] : null);
   const nextSceneToShow = isPlaying && showTransition && currentPreviewIndex < scenes.length - 1 
     ? scenes[currentPreviewIndex + 1] 
     : null;
@@ -382,9 +385,9 @@ export default function SimpleVideoCreator() {
                             alt="Current Scene"
                             className="w-full h-full object-cover"
                           />
-                          {/* Text Overlay */}
+                          {/* Text Overlay - FIXED: Always uses current scene data for immediate feedback */}
                           <div 
-                            className="absolute px-4 py-2 rounded max-w-[80%] transition-all duration-500"
+                            className="absolute px-4 py-2 rounded max-w-[80%] transition-all duration-300"
                             style={{
                               left: `${sceneToShow.textPosition.x}%`,
                               top: `${sceneToShow.textPosition.y}%`,
