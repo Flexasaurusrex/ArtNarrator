@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward, Clock, Zap } from 'lucide-react';
+import { Plus, Download, Play, Pause, Image, Type, Palette, SkipBack, SkipForward, Clock, Zap, RotateCcw } from 'lucide-react';
 
 interface Scene {
   id: string;
@@ -28,8 +28,8 @@ interface Scene {
     textAlign: string;
   };
   transition: string;
-  transitionDuration: number; // New: control transition length
-  transitionIntensity: number; // New: control effect intensity
+  transitionDuration: number;
+  transitionIntensity: number;
 }
 
 const TRANSITIONS = [
@@ -84,8 +84,8 @@ export default function SimpleVideoCreator() {
         textAlign: 'center'
       },
       transition: 'fade',
-      transitionDuration: 1.0, // 1 second default
-      transitionIntensity: 100 // 100% intensity default
+      transitionDuration: 1.0,
+      transitionIntensity: 100
     };
     setScenes([...scenes, newScene]);
     setCurrentScene(newScene);
@@ -105,6 +105,15 @@ export default function SimpleVideoCreator() {
     updateScene(sceneId, { imageUrl });
   };
 
+  // Reset preview to initial state
+  const resetPreview = () => {
+    setIsPlaying(false);
+    setIsTransitioning(false);
+    setNextScenePreview(null);
+    setPreviewProgress(0);
+    setCurrentPreviewIndex(0);
+  };
+
   // Enhanced preview functionality with transitions
   const startPreview = () => {
     if (scenes.length === 0) return;
@@ -112,6 +121,7 @@ export default function SimpleVideoCreator() {
     setCurrentPreviewIndex(0);
     setPreviewProgress(0);
     setIsTransitioning(false);
+    setNextScenePreview(null);
   };
 
   const stopPreview = () => {
@@ -124,7 +134,7 @@ export default function SimpleVideoCreator() {
   const nextScene = () => {
     if (currentPreviewIndex < scenes.length - 1) {
       const currentSceneData = scenes[currentPreviewIndex];
-      const transitionDuration = currentSceneData.transitionDuration * 1000; // Convert to ms
+      const transitionDuration = Math.min(currentSceneData.transitionDuration * 1000, 2000); // Max 2 seconds
       
       setIsTransitioning(true);
       setNextScenePreview(scenes[currentPreviewIndex + 1]);
@@ -143,7 +153,7 @@ export default function SimpleVideoCreator() {
   const prevScene = () => {
     if (currentPreviewIndex > 0) {
       const currentSceneData = scenes[currentPreviewIndex - 1];
-      const transitionDuration = currentSceneData.transitionDuration * 1000;
+      const transitionDuration = Math.min(currentSceneData.transitionDuration * 1000, 2000);
       
       setIsTransitioning(true);
       setNextScenePreview(scenes[currentPreviewIndex - 1]);
@@ -157,7 +167,7 @@ export default function SimpleVideoCreator() {
     }
   };
 
-  // Auto-advance preview scenes with enhanced transition effects
+  // FIXED: Auto-advance preview scenes with better transition handling
   useEffect(() => {
     if (!isPlaying || scenes.length === 0 || isTransitioning) return;
 
@@ -166,26 +176,38 @@ export default function SimpleVideoCreator() {
 
     const interval = setInterval(() => {
       setPreviewProgress(prev => {
-        const transitionStartPoint = 100 - (currentSceneData.transitionDuration / currentSceneData.duration * 100);
+        // Calculate when to start transition (but not earlier than 80% through scene)
+        const transitionStartPoint = Math.max(80, 100 - (currentSceneData.transitionDuration / currentSceneData.duration * 100));
         
         // Start transition at calculated point
-        if (prev >= transitionStartPoint && prev < 100 && currentPreviewIndex < scenes.length - 1) {
+        if (prev >= transitionStartPoint && prev < 100 && currentPreviewIndex < scenes.length - 1 && !isTransitioning) {
           setIsTransitioning(true);
           setNextScenePreview(scenes[currentPreviewIndex + 1]);
+          
+          // Force transition to complete after maximum duration to prevent freezing
+          setTimeout(() => {
+            if (isTransitioning) { // Only if still transitioning
+              setCurrentPreviewIndex(current => current + 1);
+              setPreviewProgress(0);
+              setIsTransitioning(false);
+              setNextScenePreview(null);
+            }
+          }, Math.min(currentSceneData.transitionDuration * 1000, 3000)); // Max 3 seconds
         }
         
         if (prev >= 100) {
           if (currentPreviewIndex < scenes.length - 1) {
-            setCurrentPreviewIndex(currentPreviewIndex + 1);
-            setPreviewProgress(0);
-            setIsTransitioning(false);
-            setNextScenePreview(null);
+            // Only advance if not already transitioning
+            if (!isTransitioning) {
+              setCurrentPreviewIndex(current => current + 1);
+              setPreviewProgress(0);
+            }
           } else {
             stopPreview();
           }
           return 0;
         }
-        return prev + (100 / (currentSceneData.duration * 10));
+        return Math.min(prev + (100 / (currentSceneData.duration * 10)), 100);
       });
     }, 100);
 
@@ -195,6 +217,13 @@ export default function SimpleVideoCreator() {
   const exportVideo = async () => {
     if (scenes.length === 0) {
       alert('Add at least one scene before exporting');
+      return;
+    }
+
+    // Check if scenes have images
+    const scenesWithImages = scenes.filter(scene => scene.imageUrl);
+    if (scenesWithImages.length === 0) {
+      alert('Please add images to your scenes before exporting');
       return;
     }
 
@@ -231,38 +260,36 @@ export default function SimpleVideoCreator() {
     setIsExporting(false);
   };
 
-  // FIX: Show the right scene in preview
+  // Show the right scene in preview
   const sceneToShow = isPlaying ? scenes[currentPreviewIndex] : currentScene;
   
   const getTransitionClasses = (scene: Scene, isNext = false) => {
     if (!scene) return "absolute inset-0 w-full h-full opacity-0";
     
     const baseClasses = "absolute inset-0 w-full h-full transition-all";
-    const intensity = scene.transitionIntensity / 100; // Convert percentage to decimal
-    const duration = scene.transitionDuration * 1000; // Convert to ms
+    const intensity = Math.min(scene.transitionIntensity / 100, 2); // Cap at 200%
+    const duration = Math.min(scene.transitionDuration * 1000, 3000); // Cap at 3 seconds
     
     if (!isTransitioning) {
       return `${baseClasses} ${isNext ? 'opacity-0' : 'opacity-100'}`;
     }
     
-    const transitionStyle = `duration-[${duration}ms]`;
+    const transitionStyle = `duration-${duration}`;
     
     switch (scene.transition) {
       case 'fade':
-        return `${baseClasses} ${transitionStyle} transition-opacity ${isNext ? 'opacity-100' : `opacity-${Math.round((1-intensity)*100)}`}`;
+        return `${baseClasses} transition-opacity duration-1000 ${isNext ? 'opacity-100' : `opacity-${Math.max(0, Math.round((1-intensity)*100))}`}`;
       case 'slide-left':
-        return `${baseClasses} ${transitionStyle} transition-transform ${isNext ? 'translate-x-0' : `-translate-x-${Math.round(intensity*100)}`}`;
+        return `${baseClasses} transition-transform duration-1000 ${isNext ? 'translate-x-0' : '-translate-x-full'}`;
       case 'slide-right':
-        return `${baseClasses} ${transitionStyle} transition-transform ${isNext ? 'translate-x-0' : `translate-x-${Math.round(intensity*100)}`}`;
+        return `${baseClasses} transition-transform duration-1000 ${isNext ? 'translate-x-0' : 'translate-x-full'}`;
       case 'zoom-in':
-        const zoomInScale = isNext ? 'scale-100' : `scale-${Math.round(100 + intensity*50)}`;
-        return `${baseClasses} ${transitionStyle} transition-transform ${zoomInScale} ${isNext ? 'opacity-100' : `opacity-${Math.round((1-intensity)*100)}`}`;
+        return `${baseClasses} transition-all duration-1000 ${isNext ? 'scale-100 opacity-100' : `scale-${Math.round(100 + intensity*50)} opacity-0`}`;
       case 'zoom-out':
-        const zoomOutScale = isNext ? 'scale-100' : `scale-${Math.round(100 - intensity*50)}`;
-        return `${baseClasses} ${transitionStyle} transition-transform ${zoomOutScale} ${isNext ? 'opacity-100' : `opacity-${Math.round((1-intensity)*100)}`}`;
+        return `${baseClasses} transition-all duration-1000 ${isNext ? 'scale-100 opacity-100' : `scale-${Math.max(50, Math.round(100 - intensity*50))} opacity-0`}`;
       case 'dissolve':
         const blurAmount = Math.round(intensity * 4);
-        return `${baseClasses} ${transitionStyle} transition-all ${isNext ? 'opacity-100 blur-0' : `opacity-${Math.round((1-intensity)*100)} blur-[${blurAmount}px]`}`;
+        return `${baseClasses} transition-all duration-1000 ${isNext ? 'opacity-100 blur-0' : `opacity-0 blur-[${blurAmount}px]`}`;
       default:
         return `${baseClasses} ${isNext ? '' : 'hidden'}`;
     }
@@ -399,6 +426,14 @@ export default function SimpleVideoCreator() {
                       >
                         <SkipForward className="w-4 h-4" />
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={resetPreview}
+                        title="Reset preview to beginning"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -498,10 +533,10 @@ export default function SimpleVideoCreator() {
                   </CardContent>
                 </Card>
 
-                {/* Enhanced Scene Settings with Transition Controls */}
+                {/* Enhanced Scene Settings */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
-                  {/* Content Panel - Enhanced with transition controls */}
+                  {/* Content Panel */}
                   <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-gray-200 flex items-center">
@@ -578,7 +613,7 @@ export default function SimpleVideoCreator() {
                         </Select>
                       </div>
 
-                      {/* NEW: Transition Controls */}
+                      {/* Transition Controls */}
                       <div className="bg-yellow-900/20 p-3 rounded border border-yellow-600/30">
                         <div className="flex items-center mb-2">
                           <Zap className="w-4 h-4 mr-1 text-yellow-400" />
@@ -608,7 +643,7 @@ export default function SimpleVideoCreator() {
                               value={[currentScene.transitionIntensity]}
                               onValueChange={([value]: number[]) => updateScene(currentScene.id, { transitionIntensity: value })}
                               min={10}
-                              max={200}
+                              max={150}
                               step={10}
                               className="w-full"
                             />
@@ -618,7 +653,7 @@ export default function SimpleVideoCreator() {
                     </CardContent>
                   </Card>
 
-                  {/* Position Panel - Same as before */}
+                  {/* Position Panel */}
                   <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-gray-200 flex items-center">
@@ -689,7 +724,7 @@ export default function SimpleVideoCreator() {
                     </CardContent>
                   </Card>
 
-                  {/* Text Style Panel - Same as before */}
+                  {/* Text Style Panel */}
                   <Card className="bg-gray-800 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-gray-200 flex items-center">
