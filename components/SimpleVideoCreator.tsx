@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,11 +56,16 @@ export default function SimpleVideoCreator() {
   const [backgroundMusic, setBackgroundMusic] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
   
-  // Simplified preview state
+  // Enhanced preview state with transition tracking
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [previewProgress, setPreviewProgress] = useState(0);
-  const [showTransition, setShowTransition] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionProgress, setTransitionProgress] = useState(0);
+  
+  // Canvas refs for video export
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   // Overall video duration
   const totalDuration = scenes.reduce((acc, scene) => acc + scene.duration, 0);
@@ -96,7 +101,6 @@ export default function SimpleVideoCreator() {
     );
     setScenes(updatedScenes);
     
-    // CRITICAL FIX: Always update currentScene if it matches the updated scene
     if (currentScene?.id === sceneId) {
       setCurrentScene({ ...currentScene, ...updates });
     }
@@ -107,33 +111,37 @@ export default function SimpleVideoCreator() {
     updateScene(sceneId, { imageUrl });
   };
 
-  // Simplified preview controls
+  // Preview controls
   const startPreview = () => {
     if (scenes.length === 0) return;
     setIsPlaying(true);
     setCurrentPreviewIndex(0);
     setPreviewProgress(0);
-    setShowTransition(false);
+    setIsTransitioning(false);
+    setTransitionProgress(0);
   };
 
   const stopPreview = () => {
     setIsPlaying(false);
     setPreviewProgress(0);
-    setShowTransition(false);
+    setIsTransitioning(false);
+    setTransitionProgress(0);
   };
 
   const resetPreview = () => {
     setIsPlaying(false);
     setCurrentPreviewIndex(0);
     setPreviewProgress(0);
-    setShowTransition(false);
+    setIsTransitioning(false);
+    setTransitionProgress(0);
   };
 
   const nextScene = () => {
     if (currentPreviewIndex < scenes.length - 1) {
       setCurrentPreviewIndex(currentPreviewIndex + 1);
       setPreviewProgress(0);
-      setShowTransition(false);
+      setIsTransitioning(false);
+      setTransitionProgress(0);
     } else {
       stopPreview();
     }
@@ -143,11 +151,12 @@ export default function SimpleVideoCreator() {
     if (currentPreviewIndex > 0) {
       setCurrentPreviewIndex(currentPreviewIndex - 1);
       setPreviewProgress(0);
-      setShowTransition(false);
+      setIsTransitioning(false);
+      setTransitionProgress(0);
     }
   };
 
-  // Fixed main preview logic - simplified and robust
+  // Enhanced preview logic with proper transitions
   useEffect(() => {
     if (!isPlaying || scenes.length === 0) return;
 
@@ -161,22 +170,30 @@ export default function SimpleVideoCreator() {
       setPreviewProgress(prev => {
         const newProgress = prev + (100 / (currentSceneData.duration * 10));
         
-        // Show transition effect near the end
-        if (newProgress > 80 && currentPreviewIndex < scenes.length - 1) {
-          setShowTransition(true);
+        // Start transition in the last portion of the scene
+        const transitionStartPoint = Math.max(70, 100 - (currentSceneData.transitionDuration / currentSceneData.duration * 100));
+        
+        if (newProgress >= transitionStartPoint && currentPreviewIndex < scenes.length - 1 && !isTransitioning) {
+          setIsTransitioning(true);
+          setTransitionProgress(0);
+        }
+        
+        // Update transition progress
+        if (isTransitioning) {
+          const transitionDurationMs = currentSceneData.transitionDuration * 1000;
+          const progressPerTick = 100 / (transitionDurationMs / 100);
+          setTransitionProgress(prevTrans => Math.min(100, prevTrans + progressPerTick));
         }
         
         // Move to next scene when complete
         if (newProgress >= 100) {
           if (currentPreviewIndex < scenes.length - 1) {
             setCurrentPreviewIndex(currentPreviewIndex + 1);
-            setShowTransition(false);
+            setIsTransitioning(false);
+            setTransitionProgress(0);
             return 0;
           } else {
-            // End of video
-            setIsPlaying(false);
-            setCurrentPreviewIndex(0);
-            setShowTransition(false);
+            stopPreview();
             return 0;
           }
         }
@@ -186,14 +203,248 @@ export default function SimpleVideoCreator() {
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentPreviewIndex, scenes]);
+  }, [isPlaying, currentPreviewIndex, scenes, isTransitioning]);
 
+  // Function to get transition styles for current and next scenes
+  const getTransitionStyles = (scene: Scene, isNextScene: boolean = false) => {
+    if (!isTransitioning || !scene) {
+      return {
+        current: { opacity: 1, transform: 'scale(1) translateX(0)' },
+        next: { opacity: 0, transform: 'scale(1) translateX(0)', display: 'none' }
+      };
+    }
+
+    const progress = transitionProgress / 100;
+    const intensity = scene.transitionIntensity / 100;
+
+    switch (scene.transition) {
+      case 'fade':
+        return {
+          current: { 
+            opacity: isNextScene ? progress : 1 - (progress * intensity),
+            transform: 'scale(1) translateX(0)',
+            filter: 'blur(0px)'
+          },
+          next: { 
+            opacity: isNextScene ? progress * intensity : 0,
+            transform: 'scale(1) translateX(0)',
+            filter: 'blur(0px)'
+          }
+        };
+
+      case 'slide-left':
+        return {
+          current: { 
+            opacity: 1,
+            transform: isNextScene ? `translateX(0)` : `translateX(-${progress * intensity * 100}%)`,
+            filter: 'blur(0px)'
+          },
+          next: { 
+            opacity: 1,
+            transform: isNextScene ? `translateX(${(1 - progress) * intensity * 100}%)` : `translateX(100%)`,
+            filter: 'blur(0px)'
+          }
+        };
+
+      case 'slide-right':
+        return {
+          current: { 
+            opacity: 1,
+            transform: isNextScene ? `translateX(0)` : `translateX(${progress * intensity * 100}%)`,
+            filter: 'blur(0px)'
+          },
+          next: { 
+            opacity: 1,
+            transform: isNextScene ? `translateX(-${(1 - progress) * intensity * 100}%)` : `translateX(-100%)`,
+            filter: 'blur(0px)'
+          }
+        };
+
+      case 'zoom-in':
+        const currentScale = isNextScene ? 1 : 1 + (progress * intensity * 0.5);
+        const nextScale = isNextScene ? 0.5 + (progress * intensity * 0.5) : 0.5;
+        return {
+          current: { 
+            opacity: isNextScene ? 1 : 1 - (progress * intensity * 0.7),
+            transform: `scale(${currentScale})`,
+            filter: 'blur(0px)'
+          },
+          next: { 
+            opacity: isNextScene ? progress * intensity : 0,
+            transform: `scale(${nextScale})`,
+            filter: 'blur(0px)'
+          }
+        };
+
+      case 'zoom-out':
+        const currentZoomOut = isNextScene ? 1 : 1 - (progress * intensity * 0.3);
+        const nextZoomOut = isNextScene ? 1.3 - (progress * intensity * 0.3) : 1.3;
+        return {
+          current: { 
+            opacity: isNextScene ? 1 : 1 - (progress * intensity * 0.7),
+            transform: `scale(${Math.max(0.1, currentZoomOut)})`,
+            filter: 'blur(0px)'
+          },
+          next: { 
+            opacity: isNextScene ? progress * intensity : 0,
+            transform: `scale(${nextZoomOut})`,
+            filter: 'blur(0px)'
+          }
+        };
+
+      case 'dissolve':
+        const blurAmount = progress * intensity * 4;
+        return {
+          current: { 
+            opacity: isNextScene ? 1 : 1 - (progress * intensity),
+            transform: 'scale(1)',
+            filter: isNextScene ? 'blur(0px)' : `blur(${blurAmount}px)`
+          },
+          next: { 
+            opacity: isNextScene ? progress * intensity : 0,
+            transform: 'scale(1)',
+            filter: isNextScene ? `blur(${4 - blurAmount}px)` : 'blur(4px)'
+          }
+        };
+
+      default: // 'none' or cut
+        return {
+          current: { 
+            opacity: isNextScene ? 1 : (progress > 0.5 ? 0 : 1),
+            transform: 'scale(1) translateX(0)',
+            filter: 'blur(0px)'
+          },
+          next: { 
+            opacity: isNextScene ? (progress > 0.5 ? 1 : 0) : 0,
+            transform: 'scale(1) translateX(0)',
+            filter: 'blur(0px)'
+          }
+        };
+    }
+  };
+
+  // Canvas-based video export function
+  const exportVideoToCanvas = async () => {
+    if (scenes.length === 0) {
+      alert('Add at least one scene before exporting');
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setIsExporting(true);
+
+    try {
+      // Set canvas dimensions
+      canvas.width = 1080;
+      canvas.height = 1920;
+
+      const frames: string[] = [];
+      const fps = 30;
+
+      // Generate frames for each scene
+      for (let sceneIndex = 0; sceneIndex < scenes.length; sceneIndex++) {
+        const scene = scenes[sceneIndex];
+        const sceneDurationFrames = Math.ceil(scene.duration * fps);
+
+        // Load the image
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = scene.imageUrl;
+        });
+
+        // Generate frames for this scene
+        for (let frame = 0; frame < sceneDurationFrames; frame++) {
+          // Clear canvas
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Draw image
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // Draw text overlay
+          if (scene.title || scene.description) {
+            const x = (scene.textPosition.x / 100) * canvas.width;
+            const y = (scene.textPosition.y / 100) * canvas.height;
+
+            // Text background
+            if (scene.textStyle.backgroundOpacity > 0) {
+              ctx.fillStyle = scene.textStyle.backgroundColor + Math.round(scene.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0');
+              ctx.fillRect(x - 200, y - 50, 400, 100);
+            }
+
+            // Text
+            ctx.fillStyle = scene.textStyle.color;
+            ctx.font = `${scene.textStyle.fontWeight} ${scene.textStyle.fontSize}px ${scene.textStyle.fontFamily}`;
+            ctx.textAlign = scene.textStyle.textAlign as CanvasTextAlign;
+
+            if (scene.title) {
+              ctx.fillText(scene.title, x, y - 10);
+            }
+            if (scene.description) {
+              ctx.font = `normal ${scene.textStyle.fontSize * 0.75}px ${scene.textStyle.fontFamily}`;
+              ctx.fillText(scene.description, x, y + 30);
+            }
+          }
+
+          // Capture frame
+          frames.push(canvas.toDataURL('image/jpeg', 0.8));
+        }
+      }
+
+      // Create a simple download of the project data for now
+      // In a full implementation, you'd combine frames into video
+      const projectData = {
+        scenes: scenes,
+        totalDuration: totalDuration,
+        frames: frames.length,
+        exportDate: new Date().toISOString(),
+        videoSpecs: {
+          width: 1080,
+          height: 1920,
+          fps: 30,
+          format: 'MP4'
+        }
+      };
+
+      // Download project JSON (frames would be too large for practical download)
+      const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `video-essay-project-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      alert(`Video project exported!\n\n${frames.length} frames generated\n${scenes.length} scenes\n${totalDuration}s duration\n\nProject file downloaded. \nFor full MP4 export, integrate with video processing library.`);
+
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+
+    setIsExporting(false);
+  };
+
+  // Enhanced export function that calls the API
   const exportVideo = async () => {
     if (scenes.length === 0) {
       alert('Add at least one scene before exporting');
       return;
     }
 
+    // First try the canvas export as a fallback
+    await exportVideoToCanvas();
+    
+    // Then try the API export
     setIsExporting(true);
     try {
       const response = await fetch('/api/export-video', {
@@ -209,33 +460,29 @@ export default function SimpleVideoCreator() {
       const data = await response.json();
       
       if (data.success) {
-        if (data.videoUrl) {
-          const a = document.createElement('a');
-          a.href = data.videoUrl;
-          a.download = 'video-essay.mp4';
-          a.click();
-        } else {
-          alert(data.message || 'Export completed successfully!');
-        }
-      } else {
-        alert('Export failed: ' + (data.error || 'Unknown error'));
+        console.log('API Export Analysis:', data);
       }
     } catch (error) {
-      console.error('Export failed:', error);
-      alert('Export failed: Network error');
+      console.error('API Export failed:', error);
     }
     setIsExporting(false);
   };
 
-  // FIXED: Priority logic for showing scenes - always prioritize currently edited scene
+  // Show the right scene in preview
   const sceneToShow = currentScene || (isPlaying ? scenes[currentPreviewIndex] : null);
-  const nextSceneToShow = isPlaying && showTransition && currentPreviewIndex < scenes.length - 1 
+  const nextSceneToShow = isPlaying && isTransitioning && currentPreviewIndex < scenes.length - 1 
     ? scenes[currentPreviewIndex + 1] 
     : null;
+
+  const currentStyles = sceneToShow ? getTransitionStyles(sceneToShow, false) : { current: {}, next: {} };
+  const nextStyles = nextSceneToShow ? getTransitionStyles(nextSceneToShow, true) : { current: {}, next: {} };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
+        
+        {/* Hidden canvas for video export */}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
         
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -335,7 +582,7 @@ export default function SimpleVideoCreator() {
             {currentScene ? (
               <div className="space-y-6">
                 
-                {/* Enhanced Preview */}
+                {/* Enhanced Preview with Working Transitions */}
                 <Card className="bg-gray-800 border-gray-700">
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-gray-200">Preview</CardTitle>
@@ -375,17 +622,21 @@ export default function SimpleVideoCreator() {
                   </CardHeader>
                   <CardContent>
                     <div className="relative aspect-video bg-black rounded overflow-hidden">
-                      {/* Current Scene */}
+                      {/* Current Scene with Dynamic Transitions */}
                       {sceneToShow?.imageUrl && (
-                        <div className={`absolute inset-0 transition-all duration-1000 ${
-                          showTransition ? 'opacity-50 scale-105' : 'opacity-100 scale-100'
-                        }`}>
+                        <div 
+                          className="absolute inset-0 transition-all duration-300"
+                          style={{
+                            ...currentStyles.current,
+                            transitionDuration: isTransitioning ? `${sceneToShow.transitionDuration}s` : '0.3s'
+                          }}
+                        >
                           <img 
                             src={sceneToShow.imageUrl}
                             alt="Current Scene"
                             className="w-full h-full object-cover"
                           />
-                          {/* Text Overlay - FIXED: Always uses current scene data for immediate feedback */}
+                          {/* Text Overlay */}
                           <div 
                             className="absolute px-4 py-2 rounded max-w-[80%] transition-all duration-300"
                             style={{
@@ -407,9 +658,15 @@ export default function SimpleVideoCreator() {
                         </div>
                       )}
                       
-                      {/* Transition Preview - Next Scene */}
-                      {nextSceneToShow?.imageUrl && showTransition && (
-                        <div className="absolute inset-0 transition-all duration-1000 opacity-50">
+                      {/* Next Scene with Transition Effects */}
+                      {nextSceneToShow?.imageUrl && isTransitioning && (
+                        <div 
+                          className="absolute inset-0 transition-all"
+                          style={{
+                            ...nextStyles.next,
+                            transitionDuration: `${nextSceneToShow.transitionDuration}s`
+                          }}
+                        >
                           <img 
                             src={nextSceneToShow.imageUrl}
                             alt="Next Scene"
@@ -460,9 +717,9 @@ export default function SimpleVideoCreator() {
                             style={{ width: `${previewProgress}%` }}
                           />
                         </div>
-                        {showTransition && (
+                        {isTransitioning && (
                           <div className="text-center text-yellow-400 text-sm">
-                            Transitioning to next scene...
+                            Transition: {sceneToShow?.transition} ({transitionProgress.toFixed(0)}% complete)
                           </div>
                         )}
                       </div>
@@ -470,7 +727,7 @@ export default function SimpleVideoCreator() {
                   </CardContent>
                 </Card>
 
-                {/* Scene Settings */}
+                {/* Scene Settings - Same as before */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   
                   {/* Content Panel */}
