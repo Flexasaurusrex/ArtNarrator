@@ -1,4 +1,5 @@
-import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import React from 'react';
+import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig, Audio } from 'remotion';
 
 interface Scene {
   id: string;
@@ -20,18 +21,33 @@ interface Scene {
     textAlign: string;
   };
   transition: string;
+  transitionDuration: number;
+  transitionIntensity: number;
 }
 
 interface VideoEssayCompositionProps {
   scenes: Scene[];
-  backgroundMusic?: string;
+  backgroundMusic?: string | null;
 }
 
-export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ scenes }) => {
+export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ 
+  scenes, 
+  backgroundMusic 
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   
-  // Calculate which scene should be showing based on current frame
+  if (!scenes || scenes.length === 0) {
+    return (
+      <AbsoluteFill style={{ backgroundColor: '#000000', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ color: 'white', fontSize: 48, fontFamily: 'Arial' }}>
+          No scenes provided
+        </div>
+      </AbsoluteFill>
+    );
+  }
+
+  // Calculate which scene should be showing
   let currentSceneIndex = 0;
   let sceneStartFrame = 0;
   let accumulatedFrames = 0;
@@ -49,18 +65,36 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
   const currentScene = scenes[currentSceneIndex];
   const nextScene = scenes[currentSceneIndex + 1];
   
-  if (!currentScene) return null;
+  if (!currentScene) {
+    return (
+      <AbsoluteFill style={{ backgroundColor: '#000000' }}>
+        <div style={{ 
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          color: 'white',
+          fontSize: 32,
+          fontFamily: 'Arial',
+          textAlign: 'center'
+        }}>
+          End of Video
+        </div>
+      </AbsoluteFill>
+    );
+  }
   
   const sceneDurationInFrames = currentScene.duration * fps;
-  const transitionDurationInFrames = fps * 0.8; // 0.8 second transitions
+  const sceneProgress = (frame - sceneStartFrame) / sceneDurationInFrames;
+  const transitionDurationInFrames = currentScene.transitionDuration * fps;
   
-  // Check if we're in transition phase (last 0.8 seconds of scene)
+  // Check if we're in transition phase
   const isInTransition = nextScene && (frame - sceneStartFrame) >= (sceneDurationInFrames - transitionDurationInFrames);
   const transitionProgress = isInTransition ? 
     ((frame - sceneStartFrame) - (sceneDurationInFrames - transitionDurationInFrames)) / transitionDurationInFrames : 0;
   
-  // Transition animations
-  const getTransitionStyle = (scene: Scene, isNext: boolean, progress: number) => {
+  // Transition animations with intensity control
+  const getTransitionStyle = (scene: Scene, isNext: boolean, progress: number): React.CSSProperties => {
     const baseStyle: React.CSSProperties = {
       position: 'absolute',
       width: '100%',
@@ -70,42 +104,50 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
     if (!isInTransition && !isNext) {
       return baseStyle;
     }
+
+    const intensity = scene.transitionIntensity / 100;
     
     switch (scene.transition) {
       case 'fade':
         return {
           ...baseStyle,
-          opacity: isNext ? progress : 1 - progress,
+          opacity: isNext ? progress * intensity : Math.max(0, 1 - (progress * intensity)),
         };
       case 'slide-left':
         return {
           ...baseStyle,
-          transform: `translateX(${isNext ? (1 - progress) * 100 : -progress * 100}%)`,
+          transform: `translateX(${isNext ? (1 - progress) * 100 * intensity : -(progress * 100 * intensity)}%)`,
         };
       case 'slide-right':
         return {
           ...baseStyle,
-          transform: `translateX(${isNext ? (progress - 1) * 100 : progress * 100}%)`,
+          transform: `translateX(${isNext ? (progress - 1) * 100 * intensity : progress * 100 * intensity}%)`,
         };
       case 'zoom-in':
+        const zoomInScale = isNext ? 
+          0.5 + (progress * intensity * 0.5) : 
+          1 + (progress * intensity * 0.5);
         return {
           ...baseStyle,
-          transform: `scale(${isNext ? 0.5 + progress * 0.5 : 1 + progress * 0.5})`,
-          opacity: isNext ? progress : 1 - progress * 0.5,
+          transform: `scale(${zoomInScale})`,
+          opacity: isNext ? progress * intensity : Math.max(0, 1 - (progress * intensity * 0.5)),
         };
       case 'zoom-out':
+        const zoomOutScale = isNext ? 
+          (1 - intensity * 0.5) + (progress * intensity * 0.5) : 
+          1 - (progress * intensity * 0.5);
         return {
           ...baseStyle,
-          transform: `scale(${isNext ? progress + 0.5 : 1 - progress * 0.5})`,
-          opacity: isNext ? progress : 1 - progress * 0.5,
+          transform: `scale(${Math.max(0.1, zoomOutScale)})`,
+          opacity: isNext ? progress * intensity : Math.max(0, 1 - (progress * intensity * 0.5)),
         };
       case 'dissolve':
         return {
           ...baseStyle,
-          opacity: isNext ? progress : 1 - progress,
-          filter: `blur(${isNext ? (1 - progress) * 4 : progress * 4}px)`,
+          opacity: isNext ? progress * intensity : Math.max(0, 1 - (progress * intensity)),
+          filter: `blur(${isNext ? (1 - progress) * intensity * 4 : progress * intensity * 4}px)`,
         };
-      default:
+      default: // 'none' or cut
         return {
           ...baseStyle,
           opacity: isNext && progress > 0.5 ? 1 : (!isNext ? 1 : 0),
@@ -129,6 +171,11 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
   
   return (
     <AbsoluteFill style={{ backgroundColor: '#000000' }}>
+      {/* Background Music */}
+      {backgroundMusic && (
+        <Audio src={backgroundMusic} volume={0.3} />
+      )}
+      
       {/* Current Scene */}
       <div style={getTransitionStyle(currentScene, false, transitionProgress)}>
         <Img
@@ -150,23 +197,28 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
             maxWidth: '80%',
             padding: '16px 24px',
             borderRadius: '8px',
-            fontFamily: currentScene.textStyle.fontFamily,
+            fontFamily: currentScene.textStyle.fontFamily || 'Arial',
             fontSize: `${currentScene.textStyle.fontSize}px`,
-            fontWeight: currentScene.textStyle.fontWeight,
+            fontWeight: currentScene.textStyle.fontWeight || 'bold',
             color: currentScene.textStyle.color,
             backgroundColor: `${currentScene.textStyle.backgroundColor}${Math.round(currentScene.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0')}`,
             textAlign: currentScene.textStyle.textAlign as any,
             backdropFilter: currentScene.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none',
             opacity: textOpacity,
             lineHeight: 1.4,
+            boxSizing: 'border-box',
           }}
         >
-          <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-            {currentScene.title}
-          </div>
-          <div style={{ fontSize: `${currentScene.textStyle.fontSize * 0.75}px` }}>
-            {currentScene.description}
-          </div>
+          {currentScene.title && (
+            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+              {currentScene.title}
+            </div>
+          )}
+          {currentScene.description && (
+            <div style={{ fontSize: `${currentScene.textStyle.fontSize * 0.75}px` }}>
+              {currentScene.description}
+            </div>
+          )}
         </div>
       </div>
       
@@ -192,23 +244,28 @@ export const VideoEssayComposition: React.FC<VideoEssayCompositionProps> = ({ sc
               maxWidth: '80%',
               padding: '16px 24px',
               borderRadius: '8px',
-              fontFamily: nextScene.textStyle.fontFamily,
+              fontFamily: nextScene.textStyle.fontFamily || 'Arial',
               fontSize: `${nextScene.textStyle.fontSize}px`,
-              fontWeight: nextScene.textStyle.fontWeight,
+              fontWeight: nextScene.textStyle.fontWeight || 'bold',
               color: nextScene.textStyle.color,
               backgroundColor: `${nextScene.textStyle.backgroundColor}${Math.round(nextScene.textStyle.backgroundOpacity * 2.55).toString(16).padStart(2, '0')}`,
               textAlign: nextScene.textStyle.textAlign as any,
               backdropFilter: nextScene.textStyle.backgroundOpacity > 0 ? 'blur(4px)' : 'none',
               opacity: transitionProgress,
               lineHeight: 1.4,
+              boxSizing: 'border-box',
             }}
           >
-            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-              {nextScene.title}
-            </div>
-            <div style={{ fontSize: `${nextScene.textStyle.fontSize * 0.75}px` }}>
-              {nextScene.description}
-            </div>
+            {nextScene.title && (
+              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+                {nextScene.title}
+              </div>
+            )}
+            {nextScene.description && (
+              <div style={{ fontSize: `${nextScene.textStyle.fontSize * 0.75}px` }}>
+                {nextScene.description}
+              </div>
+            )}
           </div>
         </div>
       )}
